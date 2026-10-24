@@ -1,0 +1,18 @@
+# Never publish device-specific or vendor-owned artifacts from this lab.
+.DS_Store
+.env
+.env.*
+backups/
+captures/
+firmware/
+private/
+*.bin
+*.img
+*.zip
+*.tar
+*.pcap
+*.h265
+*.mkv
+*.log
+*password*
+*secret*
