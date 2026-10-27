@@ -1,18 +1,23 @@
 # XM530V200 X4C-WQ camera research
 
-Field notes from two personally owned Xiongmai/XMEye cameras in the `XM530V200_X4C-WQ_8M` family (firmware ID `000807A8`). This repository records what worked, what failed, and what remains unverified. It is not a firmware distribution or a universal unlock tool.
+Field notes from two personally owned Xiongmai/XMEye `XM530V200_X4C-WQ_8M` cameras (firmware ID `000807A8`), called **cels** and **pagalms**. Observations are dated, not a live status page. We distinguish actual stream/driver evidence from firmware analysis and hypotheses. No vendor firmware, executable root payload, flash dump, credentials, private network addresses, or footage is distributed.
 
-## Key findings
+## Results through 2026-10-25
 
-- A FAT32 microSD boot hook (`sd_run.sh`) gave us a **temporary root shell** on one camera. We later used a short-lived custom-partition maintenance hook, then removed it. See [root access and recovery](docs/root-access.md).
-- The stock firmware advertises H.265 only. Forcing H.264 into its real encoder profile made the camera request H.264, but Sofia failed channel creation with `x264_param_default_preset is not supported`. Config changes alone did **not** produce H.264.
-- Both cameras currently output H.265 at 2560×1440 on their main streams. That is an encoded frame size, **not proof** of 4 MP optical detail. A same-board vendor profile lists a 1920×1080 `CapWHXY` field; its meaning in the live capture pipeline remains unverified. See [imaging and codec findings](docs/findings.md).
-- The stock microphone stream is 8 kHz mono G.711 A-law. A requested LPCM change was accepted by the API but did not change the actual RTSP audio codec.
+| Question | Finding |
+| --- | --- |
+| Is 2560×1440 native? | **Cels:** no. Live VI reported 1920×1080 capture enlarged to 2560×1440 destination; ISP called it `2M->4M`. After a custom-partition change, both capture and destination were 1920×1080 and RTSP produced 1080p. **Pagalms:** still outputs 1440p; its internal pipeline has not been measured. |
+| Which sensor? | Cels is strongly identified as SmartSens SC223A by live ID 41, 1928×1088 active area, and the build-matched ISP probe. Pagalms' sensor is unverified. |
+| Is 25 fps real? | Not in the tested mode. Cels ISP and actual stream stayed at 20 fps even when an exposed sensor-FPS setting was changed to 25; that test was rolled back. |
+| H.264? | No working camera-side H.264 from tested API settings, Sofia patches, generic XM530 H.264 driver, or full-HD x264 software test. Some attempts advertised H.264 but sent **no frames**. H.265 works. |
+| PCM audio? | No higher-quality camera-side PCM path demonstrated. Actual RTSP remained 8 kHz mono G.711 A-law after an LPCM request. |
 
-## Boundaries
+Details: [imaging and sensor](docs/findings.md), [encoder/frame rate](docs/encoder-and-frame-rate.md), [H.264 and audio](docs/h264-investigation.md), [camera controls](docs/camera-controls.md), [root access and recovery](docs/root-access.md), [experiment log](docs/experiment-log.md), and [sources](REFERENCES.md).
 
-These notes concern our own devices. Do not test on systems you do not own or administer. The historic maintenance listener had no authentication and would have exposed root to the LAN; it was removed after the experiment. This repository deliberately does not include that listener, passwords, private IP addresses, MAC addresses, camera footage, flash dumps, or proprietary firmware. See [SECURITY.md](SECURITY.md).
+## Last tested configuration
 
-The source projects that made the investigation possible are credited in [REFERENCES.md](REFERENCES.md). Their code and licenses remain with their authors; none is vendored here.
+On 2026-10-25, cels emitted 1920×1080 HEVC main video at 20 measured fps and an 800×448 HEVC substream at 12 fps. Main encoder: VBR 8192 kbit/s, quality 6, FPS 20, GOP 1; sub: VBR 2048 kbit/s, quality 6. Pagalms emitted 2560×1440 HEVC main video around 20 fps and an 800×448 HEVC substream at 10 fps. Main encoder: CBR 8192 kbit/s, quality 6, FPS 20, GOP 1; sub: CBR 2048 kbit/s, quality 6. These are the best **verified** settings from the tests, not proof of an absolute hardware limit. RTSP `avg_frame_rate` could still report 25 and is not a reliable count of distinct frames.
 
-Original text in this repository is released under the [MIT License](LICENSE). No Xiongmai firmware is licensed or redistributed by that statement.
+Cels' temporary, server-source-restricted but **unauthenticated** root maintenance listener remained installed at last check with the owner's approval. It is not a secure permanent design. See [security](SECURITY.md).
+
+The work concerns only devices we own/administer. Original prose is [MIT-licensed](LICENSE); that does not license vendor firmware or third-party code.

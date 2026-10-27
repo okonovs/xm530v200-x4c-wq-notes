@@ -1,30 +1,26 @@
-# Root access: what we actually used
+# Root access, maintenance, and recovery
 
-This is a record of an experiment on one of our own `XM530V200_X4C-WQ_8M` cameras, not a claim that every XM530 camera has the same firmware behavior. The access path came from [zhellmann/xm530](https://github.com/zhellmann/xm530), which identified two boot hooks in this SoC family's firmware.
+This describes personally owned hardware, **not** a generic unlock procedure. [zhellmann/xm530](https://github.com/zhellmann/xm530) identified the boot hooks. This repo intentionally contains no runnable payload or flash image.
 
-## 1. Reversible microSD boot hook
+## Mechanisms used
 
-On the tested firmware, `/usr/bin/dvrHelper` mounts a FAT32 microSD card at `/home` and runs `/home/sd_run.sh` during boot. We prepared an SD card whose script first copied the six MTD partitions and writable configuration to the card, then bind-mounted a modified `Encode.json` **in RAM** and started a temporary maintenance shell. The camera booted with the SD card and we obtained root-level filesystem access. No flash partition was written by this first-stage SD script.
+1. On the tested firmware, `/usr/bin/dvrHelper` mounts a FAT32 microSD at `/home` and executes `/home/sd_run.sh`. Our initial script copied six MTD partitions and writable config to the card, bind-mounted a test `Encode.json` in RAM, and launched temporary root access. This first stage did **not** write flash. Removing the card and power-cycling reverses RAM changes only.
+2. Stock boot also executes `/mnt/custom/extapp.sh` from the `custom` CramFS partition before `Sofia`. A board-matched, custom-partition-only upgrade later started a tiny maintenance listener independent of Sofia. It wrote the 256-KiB **custom** partition, not `user` or `romfs`. Stock CramFS used about 192 KiB. A bad partition is harder to recover than an SD overlay.
 
-The historic script launched an **unauthenticated** shell and FTP service on the household LAN. This was a risky expedient, not a recommended deployment. We are not publishing the runnable script or listener here. A future reproduction should use an isolated network, authenticated access, a short timeout, and an explicit removal check. A complete off-device flash backup and a tested recovery path should come first.
+The original temporary shell/FTP had no authentication. One later listener accepted only one useful session and had a 15-minute limit. A corrected `SO_REUSEADDR`/syscall variant accepted three independent UID/GID-0 shell sessions. That server-source-restricted **but unauthenticated** listener was still installed on **cels** at the last check (2026-10-25), with owner approval. It was not installed on pagalms. The source-IP check is not cryptographic authentication; same-LAN compromise/spoofing remains a risk. Exact addresses, code, credentials, and images are not published.
 
-Removing the SD card and power-cycling reverses the RAM-only overlay. It does **not** reverse any later changes deliberately written to flash.
+## Recovery evidence
 
-## 2. Temporary custom-partition hook
+Known-good native-1080p/maintenance and stock-custom restore packages were kept off-device. The known-good package SHA-256 was `b57aa70bd692e6f242a145645acaa2f5e52a9e999c2d48500d5a5179eb354b7c`. Its descriptor wrote only `custom`. After one physical power cycle, cels returned real 1920×1080 HEVC frames and DVRIP login. The corrected maintenance image then allowed repeated shells while video continued.
 
-We later needed to inspect and change the persistent encoder database. The stock boot sequence runs `/mnt/custom/extapp.sh` when present. A modified copy of the **exact board's** custom partition temporarily launched a maintenance listener before Sofia started. This stage *did* write the custom flash partition and carried a higher recovery risk than the SD overlay. Once the experiment was finished, we reapplied a clean matching custom/stock image and removed the maintenance listener and temporary network export.
+One software reboot command returned success yet did not restore video; physical power-cycling was needed. Risky RAM tests used a timed reboot guard, with actual uptime and RTSP video verified afterward. A backup of cels' live custom partition was extracted and diffed before the 25-fps test; when ISP stayed at 20 fps, we rolled back to the known-good custom image. No equivalent pagalms custom-partition backup was obtained; its flash was not changed. API acknowledgement, config readback, and RTSP SDP alone were repeatedly insufficient to establish a working camera.
 
-The access was real enough to alter the saved encoder profile and observe Sofia attempt H.264 at 1920×1080. That attempt failed in the installed encoder library (`x264_param_default_preset is not supported`), and the camera was restored to its working H.265 stream. See [findings](findings.md).
+## Routes that did not establish root
 
-## What did not work
+- Generic DVRIP `telnetctrl` did not work on this firmware generation.
+- Pagalms `OPSystemUpgrade` packages containing only `Shell` commands returned an error or replied `Done` without opening the requested listener.
+- Hostname command injection was considered but not confirmed as the route used.
 
-- The ordinary authenticated DVRIP/ONVIF codec setting was clamped back to H.265.
-- Generic `telnetctrl` advice is unreliable on this XM530 firmware; [XM530 research](https://github.com/zhellmann/xm530) explains why.
-- Upgrade packages containing `Shell` commands were accepted far enough to test, but this firmware silently dropped those commands. We did not obtain root that way.
-- A possible hostname-command-injection route was considered, but **not confirmed** as the method that gave us root.
+## Better long-term design (not installed)
 
-## Current access state
-
-The shell was temporary. On 2026-10-24, a read-only LAN check found the historic maintenance port closed on both cameras. The main RTSP streams still worked. No root service is included in this repository or currently needed for normal recording.
-
-Do not treat a successful API reply or an encoder setting as proof of the output codec: verify the *actual RTSP bitstream* with `ffprobe` after any change.
+The current IP-filtered listener is a laboratory expedient. Persistent access should be key-authenticated, LAN-only, without Internet forwarding, with a stable host key and a verified removal/recovery path. Stripped ARM Dropbear might fit, but free space, writable key storage, BusyBox utilities, and reboot behavior were not established. SSH is **not** installed. Serial/physical recovery remains important for future flash work.
