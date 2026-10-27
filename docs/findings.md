@@ -2,7 +2,7 @@
 
 ## Provenance
 
-Both units identify as `XM530V200_X4C-WQ_8M`, device ID `000807A8`. Pagalms reported a 2023-05-30 build; cels a 2023-07-13 14:55:21 build. Static analysis used archived 2022 `standard` and July 2023 `TB` firmware for the same board family, **not** a dump of the currently installed user partition. Runtime `/proc/umap` observations below came from cels. Identical board names do not prove identical sensors.
+Both units identify as `XM530V200_X4C-WQ_8M`, device ID `000807A8`. Pagalms originally reported a 2023-05-30 build; cels reported 2023-07-13 14:55:21. After the 2026-10-28 upgrade, pagalms also reported 2023-07-13 14:55:21. Static analysis used archived 2022 `standard` and July 2023 `TB` firmware for the same board family, **not** a dump of the currently installed user partition. Runtime `/proc/umap` observations below came from cels. Identical board names and firmware do not prove identical sensors.
 
 ## Measured enlargement on cels
 
@@ -19,7 +19,9 @@ Ghidra traced `CapWHXY` to the VI capture rectangle and `CaptureSizes` to the de
 
 Changing **only** cels' custom-partition `CaptureSizes.4M` to `[1920,1080,1080]` made VI capture and destination both 1920×1080. `ffprobe` received real 1920×1080 HEVC main frames and the substream kept working. The `4M` UI label remained but no longer meant a 4-megapixel output. This removes the measured VI enlargement, **not** optical blur or all hidden ISP processing.
 
-Pagalms did **not** receive that flash change. Its normal DVRIP capability mask offered only `4M` main (`ResolutionMask=0x00100000`); a `1080P` request returned `Ret=606` and readback stayed `4M`. A shell-only upgrade did not establish root on its older firmware. Its own custom-partition backup and live VI/sensor readout are needed before attempting a board-specific change; copying cels' image could overwrite calibration or other differences. Pagalms' internal enlargement is plausible by analogy, not proven.
+Pagalms' normal DVRIP capability mask offered only `4M` main (`ResolutionMask=0x00100000`); `1080P` requests through both simplified and detailed encoder objects returned `Ret=606`. A shell-only upgrade did not establish root on the older build. On 2026-10-28, we upgraded its camera filesystems to the hardware-matched stock July 2023 TB build, **excluding U-Boot and U-Boot environment**. Bootloader environment in the vendor package included placeholder network/MAC values, so preserving the existing one mattered. DVRIP login and both HEVC streams returned on the July build. We then applied a separate custom-partition-only package whose extracted tree differed from TB stock in just `CustomConfig/Encode.json`, changing `CaptureSizes.4M` to `[1920,1080,1080]`. `ffprobe` subsequently received 1920×1080 main and 800×448 sub HEVC frames. Network and encoder readbacks were retained.
+
+This achieves the requested **native-sized 1080p output** on pagalms without the known 1080→1440 destination setting. It does **not** establish that its physical sensor, live VI capture rectangle, or ISP path is identical to cels; no pagalms root/ISP readout was available. A backup of its readable DVRIP configuration was kept privately on the recording server, but its original May 2023 raw custom partition was not backed up before the upgrade. The stock July TB custom image and a verified stock-custom restore package remain available for recovery while DVRIP works.
 
 ## Sensor identity
 

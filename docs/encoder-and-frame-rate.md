@@ -11,6 +11,8 @@
 
 These are short probes, not long-term drop statistics. RTSP metadata also reported `avg_frame_rate=25/1` after the FPS setting was corrected, so that field is not a count of delivered or distinct frames. Both substreams were retained; Frigate roles were not changed by these camera-side experiments.
 
+On 2026-10-28, following the pagalms stock-TB and custom-scaling upgrades, a new short `ffprobe` run received **38 1920×1080 HEVC main frames in a two-second interval** and **14 800×448 HEVC sub frames** in another two-second interval. The configured main and sub encoder values in the table remained unchanged. Frigate reported an active pagalms FFmpeg process; this is not a long-term frame-rate or physical-sensor proof.
+
 ## Why 25 fps was rolled back
 
 The archived July 2023 TB `Encode.json` declared `Vi.SensorFPS_PAL=20` and `SensorFPS_NTSC=20`. On cels, `/proc/umap/isp` reported 20.0 fps and VI delivered 20 fps. A custom-partition trial changed **only** these two JSON values to 25, with the rest of the tree diffed against the working image before flash. After reboot, configuration readback, VI requested rate, and H26X `frameRate` said 25, **but ISP still reported 20.0 and real RTSP video remained 20 fps**. We restored the known-good custom image. The setting does not change the sensor timing/PLL by itself.

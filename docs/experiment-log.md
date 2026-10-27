@@ -17,10 +17,12 @@ This log highlights failures easily mistaken for success from API readback. Date
 | 2026-10-25 | Encoder changes | Cels quality 6 made `QPMax` 45→40; GOP 1 made a 20-frame interval. A 16-Mbit setting remained 8 Mbit live and was reverted. Both substreams' bitrate increased; cels sub quality increased. |
 | 2026-10-25 | Pagalms direct 1080P and shell-only upgrade | `1080P` rejected (`Ret=606`); shell commands rejected/ignored. No custom flash; output remained 1440p. |
 | 2026-10-25 | Final short RTSP probes | Both cameras' main and substreams yielded real HEVC frames; cels main 1080p, pagalms main 1440p. |
+| 2026-10-28 | Pagalms stock July 2023 firmware upgrade | Verified archive SHA-256 `e150c6810595ec2f5da60360bdcda69ac74e48be8b55d8a6d4d4c23928a1af3d` and matching hardware descriptor. Upgraded `custom`, kernel, `romfs`, and `user`, excluding U-Boot and its environment. July build, DVRIP, and main/sub HEVC streams returned. Original May custom partition was not backed up. |
+| 2026-10-28 | Pagalms native-size custom change | Verified package SHA-256 `1d17c40f37a2e3fbe805ec18562d4647a14d9fc036adbcbf0c975ccaea7626ea` writes only `custom`, changing only `CaptureSizes.4M`. Main RTSP yielded 1920×1080 HEVC frames; sub stayed 800×448. Frigate capture remained active. Sensor/VI identity remains unproven without live root readout. |
 
 ## Priority next measurements
 
-1. Back up **pagalms' own** custom partition and read its live VI/ISP/sensor state before any native-size flash change. Do not assume cels' image fits the older build.
+1. When physical/reliable root access is available, read pagalms' live VI/ISP/sensor state to prove whether its 1080p output is sensor-native, and preserve a raw backup of the now-running custom partition. The original May 2023 raw partition is no longer available from this procedure.
 2. Find a *verified* SC223A 25-fps sensor mode for this exact board/clock/driver. JSON FPS alone demonstrably does not work; count distinct frames and inspect live ISP timing.
 3. Compare controlled daylight/night scenes and long-running RTSP/Frigate drop statistics after quality/GOP changes. Investigate hidden ISP sharpening/NR without blind register writes.
 4. Remove cels' unauthenticated maintenance listener when no longer needed, or replace it only after designing and testing key-authenticated access and recovery.
