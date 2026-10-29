@@ -14,6 +14,10 @@ Field notes from two personally owned Xiongmai/XMEye `XM530V200_X4C-WQ_8M` camer
 
 Details: [imaging and sensor](docs/findings.md), [encoder/frame rate](docs/encoder-and-frame-rate.md), [H.264 and audio](docs/h264-investigation.md), [camera controls](docs/camera-controls.md), [root access and recovery](docs/root-access.md), [experiment log](docs/experiment-log.md), and [sources](REFERENCES.md).
 
+## Offline firmware analysis, 2026-10-29
+
+The [dated analysis update](docs/firmware-analysis-2026-10-29.md) summarizes new static findings and their limits. The [research roadmap](docs/research-roadmap.md) tracks the next questions, evidence needed to close them, and the publication rules for ongoing work. These notes do not change the last tested camera configuration above.
+
 ## Last tested configuration
 
 On 2026-10-28, both main RTSP streams produced 1920×1080 HEVC frames after the pagalms upgrade; pagalms' 800×448 HEVC substream also remained available. Its DVRIP encoder settings remained CBR 8192 kbit/s, quality 6, FPS 20, GOP 1 (main) and CBR 2048 kbit/s, quality 6, FPS 10, GOP 2 (sub). Frigate reported a live pagalms FFmpeg process and zero skipped detection frames at the check. Cels' last measured main settings were VBR 8192 kbit/s, quality 6, FPS 20, GOP 1; sub VBR 2048 kbit/s, quality 6, FPS 12, GOP 2. A 1080p output and a configured 20 fps do not independently prove the physical sensor mode or long-term frame stability.
