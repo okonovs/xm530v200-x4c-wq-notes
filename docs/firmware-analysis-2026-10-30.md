@@ -20,13 +20,15 @@ clear for the main channel.
 
 | Area | Finding | Limit |
 | --- | --- | --- |
-| Codec field origin | The struct at vma `0x53c340` lives in the **`.bss`** section (`SHT_NOBITS`, zero-initialized), so the field has no value stored in the file at that address. It is written at runtime. | The source of the written value is open. It could come from parsed configuration or from a constant in code; `.bss` placement alone does not distinguish them. |
-| Writer | The field is set through calls: a bulk struct initializer copies one source value into `+0x68/+0x6c/+0x14/+0x78/+0x7c/+0x80` before returning. A scan for a constant store to the field found 11 constant writes to the shared `+0x7c` offset, but **0** of them target this struct (their base registers belong to other structs). | The config-key → bit 0 mapping still needs a type-aware (Ghidra) trace; a flat offset scan is insufficient because `+0x7c` is an overloaded struct offset. |
+| Codec field origin | The struct at vma `0x53c340` lives in the **`.bss`** section (`SHT_NOBITS`, zero-initialized), so the field has no value stored in the file at that address. A whole-program dual-decoder scan (capstone+objdump) found the struct loaded 34 times but **no traced writer** (no direct/constant/block store through a register holding `0x53c340`); it therefore retains its `.bss` zero value (H.265 default) unless written by an untraced pointer-passing callee or `memset`/`memcpy` bulk copy. | The source of the written value is open. It could come from parsed configuration or from a constant in code; `.bss` placement alone does not distinguish them. |
+| Writer | **Corrected 2026-10-30 (REA + dual-decoder):** the prior claim that a bulk struct-initializer at `0x61120` writes `+0x7c` is **refuted** — `0x61120` (`FUN_000610d4`) is a **vtable/ops-struct initializer for a different struct** (`+0x00` = a function pointer, `+0x70` = the string "Bogus message code %d"), and `+0x7c` is an overloaded offset shared by many struct types. A whole-program scan found **0 writes** to the codec struct through any direct, constant, or block path (34 loads, 0 stores through the base; the one in-function `+0x7c` store at `0x2c1554` copies the *pointer* `0x53c340` into a per-channel slot). `memset`/`memcpy` are called ~4437 times but **none provably targets `0x53c340`**. | The remaining write path — a pointer-passing callee or bulk copy that sets the field — is untraced by static liveness and needs a whole-program pointer-alias/taint trace; until then the field retains its `.bss` zero (H.265 default). |
 | H.264 capability | A codec field that is runtime/config-populated is **not** evidence of a working encoder. The firmware's **user-space H.264 path is real** (`_h264_create_chn`/`H264_PARSER`/`CEncode`/`AVEnc.SmartH264`; 55 distinct `h264` strings), and a **complete H.264 driver exists in the corpus** (`libxmvenc`/`hx280enc` `open_h264.ko`, drop-in for `xm530_h264.ko`, Hantro 8290/VEPU1, `xmvenc-test` VI harness) — see `h264-investigation.md` and `verify-h264-userpath.py` (dual-decoder PASS). | The *driver* fact is unchanged (no decodable H.264 frame; `hevc.ko` is H.265-only, no `/dev/h264`), but the physical H.264 question is **OPEN**: test by binding a known H.264 driver and encoding from the VI channel, not a closed negative. |
 
-The per-channel codec field is **runtime-populated**. Whether its value comes
-from configuration or a constant in code remains open and needs a type-aware
-trace of the struct and its callers. This does not establish a working
+The per-channel codec field has **no traced writer** in the archived `Sofia`: a
+dual-decoder scan found it loaded 34 times but never written through any traced
+path, so it retains its `.bss` zero value (H.265 default). Whether a pointer-
+passing callee or `memset`/`memcpy` bulk copy sets it at runtime (e.g. from config)
+remains open and needs a whole-program pointer-alias/taint trace. This does not establish a working
 H.264 path: that still requires captured, decodable H.264 frames from a
 specifically authorized live test.
 
