@@ -22,7 +22,7 @@ clear for the main channel.
 | --- | --- | --- |
 | Codec field origin | The struct at vma `0x53c340` lives in the **`.bss`** section (`SHT_NOBITS`, zero-initialized), so the field has no value stored in the file at that address. It is written at runtime. | The source of the written value is open. It could come from parsed configuration or from a constant in code; `.bss` placement alone does not distinguish them. |
 | Writer | The field is set through calls: a bulk struct initializer copies one source value into `+0x68/+0x6c/+0x14/+0x78/+0x7c/+0x80` before returning. A scan for a constant store to the field found 11 constant writes to the shared `+0x7c` offset, but **0** of them target this struct (their base registers belong to other structs). | The config-key → bit 0 mapping still needs a type-aware (Ghidra) trace; a flat offset scan is insufficient because `+0x7c` is an overloaded struct offset. |
-| H.264 capability | A codec field that is runtime/config-populated is **not** evidence of a working encoder. | The hardware/driver blocker is unchanged: no decodable H.264 frame has been produced, and a correct configuration still needs a driver that exists on this board. |
+| H.264 capability | A codec field that is runtime/config-populated is **not** evidence of a working encoder. The firmware's **user-space H.264 path is real** (`_h264_create_chn`/`H264_PARSER`/`CEncode`/`AVEnc.SmartH264`; 55 distinct `h264` strings), and a **complete H.264 driver exists in the corpus** (`libxmvenc`/`hx280enc` `open_h264.ko`, drop-in for `xm530_h264.ko`, Hantro 8290/VEPU1, `xmvenc-test` VI harness) — see `h264-investigation.md` and `verify-h264-userpath.py` (dual-decoder PASS). | The *driver* fact is unchanged (no decodable H.264 frame; `hevc.ko` is H.265-only, no `/dev/h264`), but the physical H.264 question is **OPEN**: test by binding a known H.264 driver and encoding from the VI channel, not a closed negative. |
 
 The per-channel codec field is **runtime-populated**. Whether its value comes
 from configuration or a constant in code remains open and needs a type-aware
@@ -128,14 +128,18 @@ code):
 ## Handoff (roadmap #6)
 
 A private open-item + evidence-gate ledger (`reproducible-handoff-2026-10-30.md`)
-closes roadmap #6: it maps each GOAL deliverable to its evidence and the 15
+closes roadmap #6: it maps each GOAL deliverable to its evidence and the 17
 corpus verifiers (all PASS), and lists every open item with the evidence gate
-that closes it. The offline queue is complete except one item (safe ranges of the
-hidden ISP families + `Acutance`, offline-advanceable but ultimately gated by a
-live A/B test). Every remaining open item needs a live test or external
-V200 H.264 documentation. See the roadmap `Progress` section for the O1–O7 gate
-table and the recommendation to **disable the hourly job** until a live test or
-V200 H.264 documentation is available.
+that closes it. This run (18th pass) **corrected** the earlier "offline queue
+empty / H.264 blocked" verdict: the firmware's user-space H.264 path is real and
+a complete H.264 driver exists in the reference corpus, so the V200 physical
+H.264 question (O2) is **open and testable by binding that driver and encoding
+from the VI channel** (`xmvenc-test -v 0`), not merely a missing document. This
+corroborates the standing editorial note that a compatible H.264 block cannot be
+excluded from the driver facts alone. O4 (safe ISP ranges) is closed; O1/O3/O5/
+O6/O7 and the O2 bind+encode test remain live-gated. See `h264-investigation.md`
+and the roadmap `Progress` section for the O1–O7 gate table and the (revised)
+recommendation to re-enable the hourly job for that live test.
 
 ## Provenance
 
