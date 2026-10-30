@@ -30,9 +30,15 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
    MIS2009, …). The earlier open “third profile” (`0xda4d`/`0xdc42`) is **SC1346**
    (chip `0x9a4d`/`0xda4d`, sensor id 36, init `0x3e0e8`). Per-profile register
    tables are I2C writes via `ioctl(/dev/i2c, …)` (value constant per pass). Still
-   open: full chip-ID → name coverage of the fallback path, and *which sensor is
-   fitted* in each camera (needs an installed-binary hash + live readback).
-- #2, #4, #5, #6: open, with offline work remaining.
+   open: the dynamic fallback, now decoded (05:06 UTC): it builds a 16-bit I2C
+    signature `(reg 0x0b<<8)|reg 0x0a` and maps six signatures to sensors
+     (`0x841→F37P`, `0x507→Q03`, `0x843→Q03P`, `0x848→H63P`, `0xa63→H63`,
+      `0xf37→F37`, verifier `verify-sensor-fallback.py`). Offline #3 is complete;
+     only *which sensor is fitted in each camera* remains, needing live readback.
+- #4 is confirmed by `verify-isp-detail-controls.py`: a closed 9-key user-tunable
+     registry (`VideoColorParam` + 7 leaves incl. `Acutance`); the 11 hidden ISP
+     detail families are absent from the config parser. #2, #5, #6 remain open;
+     offline work is nearing its end.
 
 Full detail and reproducible checks are in the dated analysis page
 `firmware-analysis-2026-10-30.md` and the private workspace.

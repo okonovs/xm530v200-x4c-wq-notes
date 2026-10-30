@@ -71,8 +71,30 @@ evidence; the installed `isp` binary has not been hashed against this archive.
 > entries in this catalog, not the whole. The open "third profile" the earlier
 > pass left as `0xda4d`/`0xdc42` is resolved: chip `0x9a4d`/`0xda4d` (branch
 > `0x3b77c`) is sensor **`SC1346`** (id 36, init `0x3e0e8`; name ptr `0x3bef4`
-> → vma `0x5b5d5`). Full chip-ID → name coverage for the fallback path and which
-> sensor is *fitted* in each camera still need more work / live readback.
+> → vma `0x5b5d5`). The dynamic fallback path is now decoded (see below); only
+> "which sensor is *fitted* in each camera" remains, which needs live readback.
+>
+> **Completion (2026-10-30 05:06 UTC): the dynamic fallback is decoded.** The
+> fallback at `0x3b8a4` reads the sensor's own I2C registers and builds a 16-bit
+> signature `signature = (reg 0x0b << 8) | reg 0x0a` (`0x3baa8`/`0x3bab4` read
+> regs `0x0a`/`0x0b` via `0x3c748`; `0x3bac8` `orr r0, r0, r11, lsl #8`), then
+> maps six signatures to sensor-id and name (verifier `verify-sensor-fallback.py`,
+> 4 checks, raw ARM words + format strings):
+>
+> | signature | sensor id | sensor name |
+> | --- | --- | --- |
+> | `0x841` | 57 | F37P |
+> | `0x507` | 133 | Q03 |
+> | `0x843` | 134 | Q03P |
+> | `0x848` | 32 | H63P |
+> | `0xa63` | 31 | H63 |
+> | `0xf37` | — (name-only) | F37 |
+>
+> So the firmware recognizes **F37/F37P/Q03/Q03P/H63/H63P** by I2C self-ID
+> signature — a broader drivable-sensor set than the 15 fixed chip-IDs. The
+> offline half of roadmap #3 is now complete (15 fixed chip-IDs + 33 names +
+> 6 dynamic signature mappings, all decoded); "which sensor is *fitted* in each
+> camera" is the remaining sub-item and needs owner-approved live readback.
 
 ## Provenance
 
