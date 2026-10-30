@@ -135,6 +135,25 @@ live device never starts the binary; live port exposure is owner-gated. The
 peer address, the device MAC, and the maintenance-shell payload are kept
 private. Reproducible check: `verify-boot-services.py`.
 
+**S3 progress (2026-10-30).** Update admission was traced. Both archived
+"all.bin" images are ZIP/PKZIP containers whose `InstallDesc.UpgradeCommand`
+lists six `Burn` steps including `custom-x.cramfs.img` — so an admitted update
+**overwrites the custom partition** (`/mnt/custom`), which wipes the owner
+maintenance hook found in S1 (`extapp.sh`) and its stock-root rollback; the
+update is thus the persistence-rollback vector. The admission gate is
+**structural** — container CRC, an incompatible-version check, and a
+per-partition size check against the MTD layout — plus an OEM MAC/serial-number
+binding (`CUpgrader::checkOEMinfoSum` / an `Mx8Q` per-device blob). **No
+cryptographic signature is verified by the `upgrader`** (no crypto routines
+present), and a per-device-integrity skip path ("skip check Mx8Q") plus a
+"cracked image" path exist in the code as a *documented-as-code* bypass whose
+reachability on this build is **unverified** (needs a caller-address trace or a
+live test). Submitters are the authenticated web/ONVIF operator
+(`upgrade.cgi`, password-serial auth) and the vendor cloud/P2P auto-upgrade.
+Reachability of the `upgrade.cgi` auth gate specifically is left to S2. The
+`Mx8Q` value, device ID, and any exploit steps are kept private. Reproducible
+check: `verify-update-admission.py`.
+
 ## Hourly research pass
 
 1. Read the private goal, handoff, latest status, and this queue. Choose the highest-priority unfinished question that can advance with the copied corpus.
