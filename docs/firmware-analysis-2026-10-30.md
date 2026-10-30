@@ -97,6 +97,34 @@ evidence; the installed `isp` binary has not been hashed against this archive.
 > register tables and callbacks still need comparison. Which sensor is *fitted*
 > in each camera also needs owner-approved live readback.
 
+## ISP detail ranges (roadmap #4 / O4)
+
+The 11 hidden ISP detail families (3D-NR/YcNR/Bpu3DNr/Vpss3DNr/DeFog/VpssDeFog/
+DRC/Sharpen/Sharpen1/Ltm/LDC) are not user-tunable config keys, so they are
+applied through the firmware's own `XM_MPI_ISP_Set*Attr` API. Their *safe*
+parameter ranges are the firmware's own SDK, which ships in the corpus
+(`references/openxiongmai/.../xm_comm_isp.h`, plus `extCfg.c`/`com.c` sample
+code):
+
+- 8-bit auto strength arrays are `Range [0, 0xFF]`: Sharpen D/Ud/Kd, 2DNR/YCNR
+  `Thresh`, DyDPC/DRC auto `Sth`, and `u8GlobalSth`.
+- DRC `au16ToneMappingValue[DRC_IDX_NUM]` is `Range [0x0, 0xffff]` (16-bit).
+- `ISP_AUTO_STENGTH_NUM = 16` (each auto family is a 16-entry ISO/strength
+  array); DeFog uses a 65-entry `au8DefogLut` plus `bUserLutEnable` `[0,1]`.
+- The firmware's safe application pattern (from `extCfg.c`) is: `Get` the attr,
+  overwrite only the 16-entry auto array, copy level 7 into indices 8–15, then
+  `Set`, treating a non-`XM_SUCCESS` return as failure.
+- The `TB isp` binary uses the same SDK API generation (7/8 checked families' error
+  strings match the header's structs).
+- The live config `Acutance` = 3848 (`0xF08`) is **> 0xFF**, so it is *not* one of
+  these 8-bit sharpen/DNR fields; it is a separate color control whose own range
+  is still unestablished.
+
+> **Gate.** These are the SDK's documented *field* ranges, i.e. a crash/safety
+> bound — not a measured image-quality recommendation. Applying any value still
+> needs the owner-authorized A/B test (O4), and a value in range can still
+> degrade the image. Verifier `verify-isp-safe-ranges.py`.
+
 ## Handoff (roadmap #6)
 
 A private open-item + evidence-gate ledger (`reproducible-handoff-2026-10-30.md`)

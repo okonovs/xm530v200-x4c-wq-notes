@@ -52,16 +52,18 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
 | O1 | `pagalms` on the TB image or a distinct build? | live media dump + SHA-256 |
 | O2 | V200-specific H.264 hardware block / MMIO mode? | V200 docs / known V200 H.264 driver |
 | O3 | Which sensor is fitted in each camera? | installed-ISP hash + live I2C signature readback |
-| O4 | Safe ranges of the hidden ISP families + `Acutance` | decompile a `Set*Attr` param struct, then live A/B |
+| O4 | Safe ranges of the hidden ISP families + `Acutance` | **Ranges established** (SDK `xm_comm_isp.h`: 8-bit `[0,0xFF]`, DRC `[0,0xffff]`, 16 levels, DeFog 65-entry LUT; safe get/set pattern from `extCfg.c`). `Acutance` (`0xF08`) is not one of the 8-bit fields. **Live A/B still pending** to confirm image effect. |
 | O5 | Spoofability of the maintenance-shell peer check | live network test (out of scope) |
 | O6 | Per-camera active ISP values | live ISP readback |
 | O7 | What change actually improves optical detail | daylight resolution chart |
 
-> **Recommendation.** The meaningful offline queue is complete; every open item
-> needs a live test or external documentation. Per this roadmap's stop rule, the
-> owner should **disable the hourly research job** and re-enable it when a live
-> test (O1/O2/O3/O6/O7) or V200 H.264 documentation (O2) is available, or to run
-> the one offline-advanceable item, O4 (a `Set*Attr` param-struct decompilation).
+> **Recommendation.** As of the O4 pass the **offline queue is empty**: every open
+> item (O1–O7) now needs a live test or external V200 H.264 documentation. O4
+> (the last offline-advanceable item) is closed — the safe field ranges are the
+> SDK's documented ranges, with the safe get/set pattern, and only the live A/B
+> image-effect test remains. Per this roadmap's stop rule, the owner should
+> **disable the hourly research job** and re-enable it when a live test
+> (O1/O3/O6/O7) or V200 H.264 documentation/driver (O2) becomes available.
 
 Full detail and reproducible checks are in the dated analysis page
 `firmware-analysis-2026-10-30.md` and the private workspace.
