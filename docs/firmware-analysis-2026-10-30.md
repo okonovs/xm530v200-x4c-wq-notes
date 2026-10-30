@@ -52,10 +52,27 @@ primary profiles were compared with a reproducible dual-decoder check.
 
 The two primary sensor profiles are therefore **separate configuration sets**, not
 one table with a parameter, and each set programs the sensor's registers over I2C
-with a uniform value per pass. Which sensor each `0xda4d`/`0xdc42` branch binds to,
-and the kernel semantics of `ioctl` commands 1 vs 3, remain open. The `SC223A`
-identification for *cels* still relies on earlier live evidence; the installed
-`isp` binary has not been hashed against this archive.
+with a uniform value per pass. The kernel semantics of `ioctl` commands 1 vs 3
+remain open. The `SC223A` identification for *cels* still relies on earlier live
+evidence; the installed `isp` binary has not been hashed against this archive.
+
+> **Correction (2026-10-30 03:24 UTC): the "three profiles" framing is too
+> narrow.** A later pass (`sensor-catalog-2026-10-30.md`, verifier
+> `verify-sensor-catalog.py`, 13 checks) showed the `isp` sensor cascade
+> `0x3b018–0x3b340` dispatches **15 distinct chip-IDs**
+> (`0xcb3e 0x9b3a 0x4210 0x5235 0x9a4d 0xcb14 0xca3f 0xcb1c 0xce1f 0xcc1a
+> 0xcb5c 0xcc41 0xda2a 0xce39 0xda4d 0xdc42`), plus a **dynamic I2C-probe
+> fallback** (`0x3b8a4` for chip `0xdc42`/unmatched, matching register
+> signatures `0x841`/`0x507`), and rodata **names 33 sensors**
+> (SC223A, SC223AP, SC1346, SC401AI, SC430AI, SC4336, SC307E, SC307C, IMX307,
+> IMX335, GC3003, MIS2009, MIS4001, F37/F37P, H63/H63P, Q03/Q03P, SC2331,
+> SC2335, SC2336/SC2336P, SC3335/SC3338, SC3235, SC120AT, SC1336, SC1345,
+> SC500AI, SC5239AI, SC4210, SC200AI, SC035GS, …). `SC223A/SC223AP` are two
+> entries in this catalog, not the whole. The open "third profile" the earlier
+> pass left as `0xda4d`/`0xdc42` is resolved: chip `0x9a4d`/`0xda4d` (branch
+> `0x3b77c`) is sensor **`SC1346`** (id 36, init `0x3e0e8`; name ptr `0x3bef4`
+> → vma `0x5b5d5`). Full chip-ID → name coverage for the fallback path and which
+> sensor is *fitted* in each camera still need more work / live readback.
 
 ## Provenance
 

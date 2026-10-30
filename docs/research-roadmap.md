@@ -17,6 +17,26 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
 | 5 | What does the audio path capture before transport encoding? | Map the source rate, processing stages, and output codec from archived code and earlier measurements; state which improvements require a live measurement. |
 | 6 | What remains for a reproducible handoff? | Review the firmware inventory, boot/media map, H.264 feasibility report, sensor/ISP report, security/persistence map, and verifier instructions against the private goal. List every open item and its evidence gate. |
 
+## Progress (as of 2026-10-30, 13 offline passes)
+
+- **#1 (codec field):** substantially closed. The main-stream codec field in `Sofia`
+   (vma `0x53c3bc`) is **not hardcoded** — it lives in `.bss` and is
+   runtime/config-populated; which config key sets it still needs a type-aware trace.
+- **#3 (sensor profiles) — reframed.** The firmware does **not** have “three
+   profiles.” Its sensor cascade (`isp`, `0x3b018–0x3b340`) dispatches **15 distinct
+   chip-IDs**, plus a **dynamic I2C-probe fallback** (`0x3b8a4`, for chip `0xdc42`/
+   unmatched, matching register signatures `0x841`/`0x507`), and rodata **names 33
+   sensors** (SC223A, SC223AP, SC1346, SC401AI, SC430AI, IMX307, IMX335, GC3003,
+   MIS2009, …). The earlier open “third profile” (`0xda4d`/`0xdc42`) is **SC1346**
+   (chip `0x9a4d`/`0xda4d`, sensor id 36, init `0x3e0e8`). Per-profile register
+   tables are I2C writes via `ioctl(/dev/i2c, …)` (value constant per pass). Still
+   open: full chip-ID → name coverage of the fallback path, and *which sensor is
+   fitted* in each camera (needs an installed-binary hash + live readback).
+- #2, #4, #5, #6: open, with offline work remaining.
+
+Full detail and reproducible checks are in the dated analysis page
+`firmware-analysis-2026-10-30.md` and the private workspace.
+
 ## Hourly research pass
 
 1. Read the private goal, handoff, latest status, and this queue. Choose the highest-priority unfinished question that can advance with the copied corpus.
