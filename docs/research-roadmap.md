@@ -96,6 +96,25 @@ Full detail and reproducible checks are in the dated analysis page
 `firmware-analysis-2026-10-30.md` and the private workspace.
 
 
+## Firmware security track
+
+The owner has also requested a backdoor and vulnerability review. The
+archived owner-modified image contains a maintenance root listener with
+only a source-address check; its presence on currently running cameras
+is unverified. This is distinct from stock vendor behavior. An initial
+stock-filesystem review found a serial login entry and a legacy root
+password-hash format, but has not established passwordless login or a
+vendor network backdoor.
+
+The offline queue is to map active startup and network services; trace
+authentication to privileged operations in the web, RTSP, and cloud/P2P
+paths; inspect firmware-update authorization and integrity checks; verify
+serial login behavior; then rank only reproducible findings with
+mitigations. A string match or bundled software version alone does not
+count as a vulnerability. Live camera tests require separate owner
+authorization, and public notes will omit credentials and operational
+exploit details.
+
 ## Hourly research pass
 
 1. Read the private goal, handoff, latest status, and this queue. Choose the highest-priority unfinished question that can advance with the copied corpus.
