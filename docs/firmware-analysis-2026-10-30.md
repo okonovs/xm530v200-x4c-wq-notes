@@ -40,14 +40,22 @@ primary profiles were compared with a reproducible dual-decoder check.
 | --- | --- | --- |
 | Chip-ID cascade | The probe compares chip IDs `0xda4d` (branch `0x3b77c`) and `0xdc42` (branch `0x3b8a4`), plus a `0xcb3e`/`0x801b` discriminator branch that separates `SC223A` from `SC223AP`. | Confirms the *branch points*; the sensor name bound to each branch is not all confirmed. |
 | Profile separation | `SC223A` (sensor id 41, init `0x42d00`) and `SC223AP` (sensor id 46, init `0x48700`) store **four** callbacks at registry offsets `+0x28/+0x2c/+0x30/+0x34`. The two profiles share **zero** callbacks (`SC223A {0x42e38,0x42d08,0x42d84,0x42e10}` vs `SC223AP {0x48814,0x48708,0x48778,0x487ec}`). | Confirms the profiles are distinct code, not that each callback's effect is fully understood. |
-| Configuration tables | Each profile's `+0x28` callback iterates a distinct `.rodata` table: `SC223A` at vma `0x67eb0` (852 bytes) and `SC223AP` at vma `0x7532c` (744 bytes). The tables differ by SHA-256 and share 0 leading 16-bit entries. | The tables are **not** a flat register/value I2C list. |
-| Table semantics | The loop reads one *advancing* halfword (`ldrh r1, [r3, r6]!`, `r6 += 4`) and one *constant-offset* halfword (`ldrh r2, [r3, #2]`), then calls the writer `0x3c7f4` (a per-sensor struct writer, stride 56). | The meaning of each halfword is **uncertain**; a prior "flat register table" framing is **not** confirmed and is withdrawn. Exact semantics need the `0x3c7f4` decompilation. |
+| Configuration tables | Each profile's `+0x28` callback iterates a distinct `.rodata` table: `SC223A` at vma `0x67eb0` (852 bytes) and `SC223AP` at vma `0x7532c` (744 bytes). The tables differ by SHA-256 and share 0 leading 16-bit entries. | Tables confirmed distinct; see the resolution below on what they contain. |
+| Table semantics (resolved) | The helper `0x3c7f4` is an **I2C register-write**: it builds a 16-byte struct and calls `ioctl(/dev/i2c, cmd, &struct)`. The loop feeds the table's two halfwords as `reg` and `value`; the **value halfword is constant per pass** (`ldrh r2, [r3, #2]`, fixed offset), so every register a pass enumerates is written the same value `table[2]`, while the register halfword advances (`ldrh r1, [r3, r6]!`). A sibling `0x3c748` uses `ioctl` command 3. | The tables **are** register/value programming tables (a prior "not a flat reg/val list" wording in this page was an over-correction and is withdrawn). The meaning of `ioctl` commands 1 vs 3 needs the out-of-corpus `/dev/i2c` kernel driver. |
+
+> **Correction (2026-10-30 02:17 UTC):** an earlier sentence in this page that said
+> the tables are *not* a flat register/value list was an over-correction. The
+> per-profile `.rodata` tables **are** sensor register/value writes delivered
+> through `ioctl(/dev/i2c, …)` with the value halfword constant per pass. The
+> detail is in the private report `sensor-i2c-writer-2026-10-30.md` and verifier
+> `verify-sensor-i2c-writer.py` (10 checks pass in both decoders).
 
 The two primary sensor profiles are therefore **separate configuration sets**, not
-one table with a parameter. Which sensor each branch binds to, and what each
-table halfword means, remain open. The `SC223A` identification for *cels* still
-relies on earlier live evidence; the installed `isp` binary has not been hashed
-against this archive.
+one table with a parameter, and each set programs the sensor's registers over I2C
+with a uniform value per pass. Which sensor each `0xda4d`/`0xdc42` branch binds to,
+and the kernel semantics of `ioctl` commands 1 vs 3, remain open. The `SC223A`
+identification for *cels* still relies on earlier live evidence; the installed
+`isp` binary has not been hashed against this archive.
 
 ## Provenance
 
