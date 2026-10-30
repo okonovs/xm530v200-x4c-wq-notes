@@ -115,6 +115,26 @@ count as a vulnerability. Live camera tests require separate owner
 authorization, and public notes will omit credentials and operational
 exploit details.
 
+**S1 progress (2026-10-30).** The stock boot chain was mapped:
+`inittab ::sysinit -> rcS` launches (in order) `dnode`, the filesystem
+mounts, `loadmod` (-> `loadpublic`, conditional `wlandaemon`/`routeswitch`),
+`netinit`, the owner `extapp.sh` hook when present, and `dvrHelper` over a
+loopback control channel, which supervises `app.sh` -> `Sofia` (the single
+long-lived application). Listening-service classification (stripped-aware
+dynamic-symbol import of `bind`+`listen`): **active at boot** = `netinit`,
+`Sofia`, `dvrHelper`; **dormant** (present in the image but referenced by no
+boot script in the archived corpus) = a debug-listener binary
+(`accept`/`bind`/`listen`/`popen`, a "listening at port" string, a debug-open
+symbol) and `iperf`; Wi-Fi/bridge tooling is conditional on matched `WIFI=`/
+`UVC=`/`NVR_FLAG` profile branches. The owner-added `extapp.sh` hook is
+present in the owner custom roots and absent in the stock root(-clean); it
+loops a small statically-linked shell that serves one connection to a
+single configured owner peer with no cryptographic authentication. "Dormant"
+means "no boot-script reference in the archived corpus" and is not a proof the
+live device never starts the binary; live port exposure is owner-gated. The
+peer address, the device MAC, and the maintenance-shell payload are kept
+private. Reproducible check: `verify-boot-services.py`.
+
 ## Hourly research pass
 
 1. Read the private goal, handoff, latest status, and this queue. Choose the highest-priority unfinished question that can advance with the copied corpus.
