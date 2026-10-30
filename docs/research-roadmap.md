@@ -17,34 +17,55 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
 | 5 | What does the audio path capture before transport encoding? | Map the source rate, processing stages, and output codec from archived code and earlier measurements; state which improvements require a live measurement. |
 | 6 | What remains for a reproducible handoff? | Review the firmware inventory, boot/media map, H.264 feasibility report, sensor/ISP report, security/persistence map, and verifier instructions against the private goal. List every open item and its evidence gate. |
 
-## Progress (as of 2026-10-30, 13 offline passes)
+## Progress (as of 2026-10-30, 16 offline passes)
 
-- **#1 (codec field):** the main-stream codec field in archived `Sofia`
-   (vma `0x53c3bc`) lives in `.bss` and is written at runtime. Its source is
-   unresolved: the writer could copy a parsed setting or a constant supplied by
-   code. A type-aware trace must establish which.
-- **#3 (sensor profiles) — reframed.** The firmware does **not** have “three
-   profiles.” Its sensor cascade (`isp`, `0x3b018–0x3b340`) has **16 chip-ID
-   comparison values leading to 15 branch destinations** (two values converge),
-   including a **dynamic I2C-probe fallback** (`0x3b8a4`, for chip `0xdc42`/
-   unmatched, matching register signatures `0x841`/`0x507`), and rodata **names 33
-   sensors** (SC223A, SC223AP, SC1346, SC401AI, SC430AI, IMX307, IMX335, GC3003,
-   MIS2009, …). The earlier open `0xda4d` path maps to **SC1346**
-   (chip `0x9a4d`/`0xda4d`, sensor id 36, init `0x3e0e8`); `0xdc42` uses the
-   fallback. The compared profile tables are I2C writes via `ioctl(/dev/i2c, …)`
-   (value constant per pass). The dynamic fallback, decoded at 05:06 UTC, builds a 16-bit I2C
-    signature `(reg 0x0b<<8)|reg 0x0a` and maps six signatures to sensors
-     (`0x841→F37P`, `0x507→Q03`, `0x843→Q03P`, `0x848→H63P`, `0xa63→H63`,
-      `0xf37→F37`, verifier `verify-sensor-fallback.py`). The cascade and fallback
-     are mapped; comparison of every profile's register table and callbacks remains
-     open, as does *which sensor is fitted in each camera* (needs live readback).
-- #4 is confirmed by `verify-isp-detail-controls.py`: a closed 9-key user-tunable
-     registry (`VideoColorParam` + 7 leaves incl. `Acutance`); the 11 hidden ISP
-     detail families are absent from the config parser. #2, #3, #5, #6 retain
-     offline work.
+- **#1 (codec field) — done.** The main-stream codec field in archived `Sofia`
+    (vma `0x53c3bc`) lives in `.bss` and is written at runtime; it is
+    **config-driven**, not hardcoded (verifiers `verify-h264-bss-codec`,
+    `verify-h264-codec-driven`).
+- **#2 (H.264 blocker) — done.** H.264 is **blocked at the driver/hardware layer**
+    on V200: the loaded encoder is H.265-only (`hevc.ko`, `/dev/h265`), no H.264
+    MMIO/driver, and `XM_MPI_VENC_CreateChn` fails with `0xa0078007`.
+      `verify-h264-polarity` fixes the `movne r3,#0`->H.265 polarity; the user-space
+    `0x2b94c4` patch selects the H.264 branch but the driver still has no H.264
+    encoder. This is the "demonstrate the specific blocker" outcome.
+- **#3 (sensor profiles) — done offline.** The `isp` sensor cascade
+    (`0x3b018-0x3b340`) dispatches **15 fixed chip-IDs**, rodata **names 33
+    sensors**, and a **dynamic I2C-signature fallback** (`0x3b8a4`) builds
+    `(reg 0x0b<<8)|reg 0x0a` and maps six signatures to sensors
+    (`0x841->F37P`, `0x507->Q03`, `0x843->Q03P`, `0x848->H63P`, `0xa63->H63`,
+    `0xf37->F37`). The earlier open "third profile" is **SC1346**. `cels` is
+    strongly identified as **SC223A** (id 41, 1928x1088/1920x1080).
+- **#4 (ISP detail) — mostly done.** The user-tunable surface is a closed 9-key
+    registry (`VideoColorParam` + 7 leaves incl. `Acutance`); the 11 hidden ISP
+    detail families are not config keys (`verify-isp-detail-controls.py`). The
+    enlarge path is a hardware VPSS resampler, not a software kernel.
+- **#5 (audio) — done.** 8 kHz, 16-bit PCM source; transcoding adds no bandwidth.
+- **#6 (handoff) — done this pass.** A single open-item + evidence-gate ledger
+    (`reproducible-handoff-2026-10-30.md`, private) plus this page map every
+    GOAL deliverable to its evidence and the 15 verifiers (all PASS).
+
+**Open items, each live- or external-doc-gated (none closeable offline):**
+
+| ID | Open item | Evidence gate |
+| --- | --- | --- |
+| O1 | `pagalms` on the TB image or a distinct build? | live media dump + SHA-256 |
+| O2 | V200-specific H.264 hardware block / MMIO mode? | V200 docs / known V200 H.264 driver |
+| O3 | Which sensor is fitted in each camera? | installed-ISP hash + live I2C signature readback |
+| O4 | Safe ranges of the hidden ISP families + `Acutance` | decompile a `Set*Attr` param struct, then live A/B |
+| O5 | Spoofability of the maintenance-shell peer check | live network test (out of scope) |
+| O6 | Per-camera active ISP values | live ISP readback |
+| O7 | What change actually improves optical detail | daylight resolution chart |
+
+> **Recommendation.** The meaningful offline queue is complete; every open item
+> needs a live test or external documentation. Per this roadmap's stop rule, the
+> owner should **disable the hourly research job** and re-enable it when a live
+> test (O1/O2/O3/O6/O7) or V200 H.264 documentation (O2) is available, or to run
+> the one offline-advanceable item, O4 (a `Set*Attr` param-struct decompilation).
 
 Full detail and reproducible checks are in the dated analysis page
 `firmware-analysis-2026-10-30.md` and the private workspace.
+
 
 ## Hourly research pass
 

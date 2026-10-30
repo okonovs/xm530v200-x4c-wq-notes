@@ -97,6 +97,18 @@ evidence; the installed `isp` binary has not been hashed against this archive.
 > register tables and callbacks still need comparison. Which sensor is *fitted*
 > in each camera also needs owner-approved live readback.
 
+## Handoff (roadmap #6)
+
+A private open-item + evidence-gate ledger (`reproducible-handoff-2026-10-30.md`)
+closes roadmap #6: it maps each GOAL deliverable to its evidence and the 15
+corpus verifiers (all PASS), and lists every open item with the evidence gate
+that closes it. The offline queue is complete except one item (safe ranges of the
+hidden ISP families + `Acutance`, offline-advanceable but ultimately gated by a
+live A/B test). Every remaining open item needs a live test or external
+V200 H.264 documentation. See the roadmap `Progress` section for the O1–O7 gate
+table and the recommendation to **disable the hourly job** until a live test or
+V200 H.264 documentation is available.
+
 ## Provenance
 
 - Static corpus: the archived TB `Sofia` and `isp` binaries, SHA-256 verified
