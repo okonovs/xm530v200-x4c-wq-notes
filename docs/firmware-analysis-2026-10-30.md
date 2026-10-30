@@ -20,16 +20,16 @@ clear for the main channel.
 
 | Area | Finding | Limit |
 | --- | --- | --- |
-| Codec field origin | The struct at vma `0x53c340` lives in the **`.bss`** section (`SHT_NOBITS`, zero-initialized), so the field has no value stored in the file at that address. A whole-program dual-decoder scan (capstone+objdump) found the struct loaded 34 times but **no traced writer** (no direct/constant/block store through a register holding `0x53c340`); it therefore retains its `.bss` zero value (H.265 default) unless written by an untraced pointer-passing callee or `memset`/`memcpy` bulk copy. | The source of the written value is open. It could come from parsed configuration or from a constant in code; `.bss` placement alone does not distinguish them. |
-| Writer | **Corrected 2026-10-30 (REA + dual-decoder):** the prior claim that a bulk struct-initializer at `0x61120` writes `+0x7c` is **refuted** — `0x61120` (`FUN_000610d4`) is a **vtable/ops-struct initializer for a different struct** (`+0x00` = a function pointer, `+0x70` = the string "Bogus message code %d"), and `+0x7c` is an overloaded offset shared by many struct types. A whole-program scan found **0 writes** to the codec struct through any direct, constant, or block path (34 loads, 0 stores through the base; the one in-function `+0x7c` store at `0x2c1554` copies the *pointer* `0x53c340` into a per-channel slot). `memset`/`memcpy` are called ~4437 times but **none provably targets `0x53c340`**. | The remaining write path — a pointer-passing callee or bulk copy that sets the field — is untraced by static liveness and needs a whole-program pointer-alias/taint trace; until then the field retains its `.bss` zero (H.265 default). |
-| H.264 capability | A codec field that is runtime/config-populated is **not** evidence of a working encoder. The firmware's **user-space H.264 path is real** (`_h264_create_chn`/`H264_PARSER`/`CEncode`/`AVEnc.SmartH264`; 55 distinct `h264` strings), and a **complete H.264 driver exists in the corpus** (`libxmvenc`/`hx280enc` `open_h264.ko`, drop-in for `xm530_h264.ko`, Hantro 8290/VEPU1, `xmvenc-test` VI harness) — see `h264-investigation.md` and `verify-h264-userpath.py` (dual-decoder PASS). | The *driver* fact is unchanged (no decodable H.264 frame; `hevc.ko` is H.265-only, no `/dev/h264`), but the physical H.264 question is **OPEN**: test by binding a known H.264 driver and encoding from the VI channel, not a closed negative. |
+| Codec field origin | The field at vma `0x53c3bc` is in `.bss`, so it starts at zero when the binary is loaded. The codec-select path reads bit 0 (H.265 when clear, H.264 when set). | Its value after startup is unknown; a later write through an alias, indirect call, or bulk copy has not been ruled out. |
+| Writer candidate | REA/Ghidra identified `0x61120` as a store within a different callback/ops structure. The matching `+0x7c` offset alone did not identify the codec writer, so the earlier writer claim is withdrawn. | The negative scanners counted 34-35 literal-base loads and found no store matching their limited forward patterns. They are not a complete call-graph or alias analysis and cannot establish that no writer exists in `Sofia` or a library. |
+| H.264 capability | The archived firmware contains a user-space H.264 path and the reference corpus contains H.264 driver source and a test harness. | Compatibility of that driver with this V200 board, kernel, register map, and encoder hardware remains unverified. No decodable H.264 frames were obtained in the earlier live tests. |
 
-The per-channel codec field has **no traced writer** in the archived `Sofia`: a
-dual-decoder scan found it loaded 34 times but never written through any traced
-path, so it retains its `.bss` zero value (H.265 default). Whether a pointer-
-passing callee or `memset`/`memcpy` bulk copy sets it at runtime (e.g. from config)
-remains open and needs a whole-program pointer-alias/taint trace. This does not establish a working
-H.264 path: that still requires captured, decodable H.264 frames from a
+The REA pass corrected one mistaken writer candidate. The source of the codec
+field remains open. The `.bss` zero is an initial value, not a measured runtime
+value. The two negative verifiers are useful only for the instruction patterns
+they actually scan; their wider absence claims have been withdrawn. The next
+offline work is a call-graph and pointer-flow audit with explicit coverage.
+A working H.264 path still requires captured, decodable frames from a
 specifically authorized live test.
 
 ## Sensor profiles (roadmap #3)
@@ -130,18 +130,18 @@ code):
 ## Handoff (roadmap #6)
 
 A private open-item + evidence-gate ledger (`reproducible-handoff-2026-10-30.md`)
-closes roadmap #6: it maps each GOAL deliverable to its evidence and the 17
-corpus verifiers (all PASS), and lists every open item with the evidence gate
+closes roadmap #6: it maps each GOAL deliverable to its evidence and the earlier verifier inventory, and lists every open item with the evidence gate
 that closes it. This run (18th pass) **corrected** the earlier "offline queue
 empty / H.264 blocked" verdict: the firmware's user-space H.264 path is real and
-a complete H.264 driver exists in the reference corpus, so the V200 physical
-H.264 question (O2) is **open and testable by binding that driver and encoding
-from the VI channel** (`xmvenc-test -v 0`), not merely a missing document. This
+the reference corpus includes H.264 driver source and a test harness. Their
+compatibility with this V200 board and kernel is unverified, so the physical
+H.264 question (O2) remains open. A live bind-and-encode test would need a
+separately reviewed compatibility and recovery plan. This
 corroborates the standing editorial note that a compatible H.264 block cannot be
 excluded from the driver facts alone. O4 (safe ISP ranges) is closed; O1/O3/O5/
 O6/O7 and the O2 bind+encode test remain live-gated. See `h264-investigation.md`
 and the roadmap `Progress` section for the O1–O7 gate table and the (revised)
-recommendation to re-enable the hourly job for that live test.
+offline compatibility work and a separately authorized live test.
 
 ## Provenance
 
