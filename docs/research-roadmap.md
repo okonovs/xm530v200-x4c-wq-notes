@@ -19,26 +19,29 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
 
 ## Progress (as of 2026-10-30, 13 offline passes)
 
-- **#1 (codec field):** substantially closed. The main-stream codec field in `Sofia`
-   (vma `0x53c3bc`) is **not hardcoded** — it lives in `.bss` and is
-   runtime/config-populated; which config key sets it still needs a type-aware trace.
+- **#1 (codec field):** the main-stream codec field in archived `Sofia`
+   (vma `0x53c3bc`) lives in `.bss` and is written at runtime. Its source is
+   unresolved: the writer could copy a parsed setting or a constant supplied by
+   code. A type-aware trace must establish which.
 - **#3 (sensor profiles) — reframed.** The firmware does **not** have “three
-   profiles.” Its sensor cascade (`isp`, `0x3b018–0x3b340`) dispatches **15 distinct
-   chip-IDs**, plus a **dynamic I2C-probe fallback** (`0x3b8a4`, for chip `0xdc42`/
+   profiles.” Its sensor cascade (`isp`, `0x3b018–0x3b340`) has **16 chip-ID
+   comparison values leading to 15 branch destinations** (two values converge),
+   including a **dynamic I2C-probe fallback** (`0x3b8a4`, for chip `0xdc42`/
    unmatched, matching register signatures `0x841`/`0x507`), and rodata **names 33
    sensors** (SC223A, SC223AP, SC1346, SC401AI, SC430AI, IMX307, IMX335, GC3003,
-   MIS2009, …). The earlier open “third profile” (`0xda4d`/`0xdc42`) is **SC1346**
-   (chip `0x9a4d`/`0xda4d`, sensor id 36, init `0x3e0e8`). Per-profile register
-   tables are I2C writes via `ioctl(/dev/i2c, …)` (value constant per pass). Still
-   open: the dynamic fallback, now decoded (05:06 UTC): it builds a 16-bit I2C
+   MIS2009, …). The earlier open `0xda4d` path maps to **SC1346**
+   (chip `0x9a4d`/`0xda4d`, sensor id 36, init `0x3e0e8`); `0xdc42` uses the
+   fallback. The compared profile tables are I2C writes via `ioctl(/dev/i2c, …)`
+   (value constant per pass). The dynamic fallback, decoded at 05:06 UTC, builds a 16-bit I2C
     signature `(reg 0x0b<<8)|reg 0x0a` and maps six signatures to sensors
      (`0x841→F37P`, `0x507→Q03`, `0x843→Q03P`, `0x848→H63P`, `0xa63→H63`,
-      `0xf37→F37`, verifier `verify-sensor-fallback.py`). Offline #3 is complete;
-     only *which sensor is fitted in each camera* remains, needing live readback.
+      `0xf37→F37`, verifier `verify-sensor-fallback.py`). The cascade and fallback
+     are mapped; comparison of every profile's register table and callbacks remains
+     open, as does *which sensor is fitted in each camera* (needs live readback).
 - #4 is confirmed by `verify-isp-detail-controls.py`: a closed 9-key user-tunable
      registry (`VideoColorParam` + 7 leaves incl. `Acutance`); the 11 hidden ISP
-     detail families are absent from the config parser. #2, #5, #6 remain open;
-     offline work is nearing its end.
+     detail families are absent from the config parser. #2, #3, #5, #6 retain
+     offline work.
 
 Full detail and reproducible checks are in the dated analysis page
 `firmware-analysis-2026-10-30.md` and the private workspace.

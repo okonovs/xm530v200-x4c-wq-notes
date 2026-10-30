@@ -20,13 +20,13 @@ clear for the main channel.
 
 | Area | Finding | Limit |
 | --- | --- | --- |
-| Codec field origin | The struct at vma `0x53c340` lives in the **`.bss`** section (`SHT_NOBITS`, zero-initialized). By loader definition it has no initial data, so the codec field **cannot be a compiled-in constant**; it is written at runtime. | This proves "not hardcoded"; it does **not** yet prove *which* configuration key sets bit 0. |
+| Codec field origin | The struct at vma `0x53c340` lives in the **`.bss`** section (`SHT_NOBITS`, zero-initialized), so the field has no value stored in the file at that address. It is written at runtime. | The source of the written value is open. It could come from parsed configuration or from a constant in code; `.bss` placement alone does not distinguish them. |
 | Writer | The field is set through calls: a bulk struct initializer copies one source value into `+0x68/+0x6c/+0x14/+0x78/+0x7c/+0x80` before returning. A scan for a constant store to the field found 11 constant writes to the shared `+0x7c` offset, but **0** of them target this struct (their base registers belong to other structs). | The config-key → bit 0 mapping still needs a type-aware (Ghidra) trace; a flat offset scan is insufficient because `+0x7c` is an overloaded struct offset. |
 | H.264 capability | A codec field that is runtime/config-populated is **not** evidence of a working encoder. | The hardware/driver blocker is unchanged: no decodable H.264 frame has been produced, and a correct configuration still needs a driver that exists on this board. |
 
-The per-channel codec field is therefore **runtime-populated, not hardcoded**.
-The exact configuration key that sets its bit 0 remains open and needs a
-type-aware trace of the struct and its callers. This does not establish a working
+The per-channel codec field is **runtime-populated**. Whether its value comes
+from configuration or a constant in code remains open and needs a type-aware
+trace of the struct and its callers. This does not establish a working
 H.264 path: that still requires captured, decodable H.264 frames from a
 specifically authorized live test.
 
@@ -59,20 +59,21 @@ evidence; the installed `isp` binary has not been hashed against this archive.
 > **Correction (2026-10-30 03:24 UTC): the "three profiles" framing is too
 > narrow.** A later pass (`sensor-catalog-2026-10-30.md`, verifier
 > `verify-sensor-catalog.py`, 13 checks) showed the `isp` sensor cascade
-> `0x3b018–0x3b340` dispatches **15 distinct chip-IDs**
+> `0x3b018–0x3b340` compares **16 chip-ID values leading to 15 branch destinations**
 > (`0xcb3e 0x9b3a 0x4210 0x5235 0x9a4d 0xcb14 0xca3f 0xcb1c 0xce1f 0xcc1a
-> 0xcb5c 0xcc41 0xda2a 0xce39 0xda4d 0xdc42`), plus a **dynamic I2C-probe
-> fallback** (`0x3b8a4` for chip `0xdc42`/unmatched, matching register
+> 0xcb5c 0xcc41 0xda2a 0xce39 0xda4d 0xdc42`; `0x9a4d` and `0xda4d` share
+> a destination), including a **dynamic I2C-probe fallback** (`0x3b8a4` for chip `0xdc42`/unmatched, matching register
 > signatures `0x841`/`0x507`), and rodata **names 33 sensors**
 > (SC223A, SC223AP, SC1346, SC401AI, SC430AI, SC4336, SC307E, SC307C, IMX307,
 > IMX335, GC3003, MIS2009, MIS4001, F37/F37P, H63/H63P, Q03/Q03P, SC2331,
 > SC2335, SC2336/SC2336P, SC3335/SC3338, SC3235, SC120AT, SC1336, SC1345,
 > SC500AI, SC5239AI, SC4210, SC200AI, SC035GS, …). `SC223A/SC223AP` are two
-> entries in this catalog, not the whole. The open "third profile" the earlier
-> pass left as `0xda4d`/`0xdc42` is resolved: chip `0x9a4d`/`0xda4d` (branch
-> `0x3b77c`) is sensor **`SC1346`** (id 36, init `0x3e0e8`; name ptr `0x3bef4`
-> → vma `0x5b5d5`). The dynamic fallback path is now decoded (see below); only
-> "which sensor is *fitted* in each camera" remains, which needs live readback.
+> entries in this catalog, not the whole. The earlier open `0xda4d` path maps to
+> **SC1346**: chip `0x9a4d`/`0xda4d` (branch `0x3b77c`), id 36, init `0x3e0e8`,
+> name ptr `0x3bef4` → vma `0x5b5d5`. The `0xdc42` path uses the dynamic
+> fallback, decoded below. Full
+> register-table and callback comparisons across the catalog remain open, as
+> does which sensor is *fitted* in each camera (needs live readback).
 >
 > **Completion (2026-10-30 05:06 UTC): the dynamic fallback is decoded.** The
 > fallback at `0x3b8a4` reads the sensor's own I2C registers and builds a 16-bit
@@ -91,10 +92,10 @@ evidence; the installed `isp` binary has not been hashed against this archive.
 > | `0xf37` | — (name-only) | F37 |
 >
 > So the firmware recognizes **F37/F37P/Q03/Q03P/H63/H63P** by I2C self-ID
-> signature — a broader drivable-sensor set than the 15 fixed chip-IDs. The
-> offline half of roadmap #3 is now complete (15 fixed chip-IDs + 33 names +
-> 6 dynamic signature mappings, all decoded); "which sensor is *fitted* in each
-> camera" is the remaining sub-item and needs owner-approved live readback.
+> signature — a broader catalog than the two primary profiles first analyzed.
+> The cascade and six fallback mappings are decoded; the other profiles'
+> register tables and callbacks still need comparison. Which sensor is *fitted*
+> in each camera also needs owner-approved live readback.
 
 ## Provenance
 
