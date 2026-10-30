@@ -153,3 +153,26 @@ offline compatibility work and a separately authorized live test.
 - Firmware, dumps, executable maintenance payloads, credentials, and device-
   specific backups remain outside this repository.
 - Work tracking and acceptance criteria: [research roadmap](research-roadmap.md).
+
+## S4 — serial getty / login semantics (2026-10-31, offline)
+
+The stock serial getty entry does **not** establish a passwordless root
+auto-login. In the archived `standard-romfs` (`etc/inittab` sha
+`3818bb9f768219a171b8714cb557542fc9364546f83696f1741d83f3f2788cb0`),
+the entry is
+`::respawn:/sbin/getty -L ttyS000 115200 vt100 -n root -I "Auto login as root ..."`.
+Three facts decide it: (1) the exact string `Auto login as root` is **absent
+from the BusyBox binary** and present only in the inittab as the `-I` issue
+text — a cosmetic banner, not a login bypass; (2) the inittab uses `-n root`,
+**not** the force-login flag `-f` — the getty option string
+(`^I:LH:f:hil:mt:+wn`, in `bin/busybox`) makes `f:` the separate force option;
+(3) getty executes the login program (`execlp`), which authenticates against the
+root MD5-crypt hash `$1$...` in `etc/passwd` (`etc/passwd` sha
+`2f0f285cdf8222cd30a54c69b002b92c7a517ce6a9bfe62d4289503296008ead`; there is
+no `/etc/shadow`). This corroborates the editorial correction that the "auto
+login" banner is misleading and must not be treated as an authentication
+property. The root hash is not cracked or published, and no camera was
+contacted. Coverage limit (stated): the exact runtime meaning of `-n` in this
+stripped `BusyBox v1.33.1` build is not fully resolved by a linear ARM decode;
+the finding is the negative (force flag not used; login program invoked).
+Reproducible check: private `verify-serial-login.py` (12 gates pass).

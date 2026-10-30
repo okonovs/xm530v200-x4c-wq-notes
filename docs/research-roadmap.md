@@ -110,7 +110,10 @@ The offline queue is to map active startup and network services; trace
 authentication to privileged operations in the web, RTSP, and cloud/P2P
 paths; inspect firmware-update authorization and integrity checks; verify
 serial login behavior; then rank only reproducible findings with
-mitigations. A string match or bundled software version alone does not
+mitigations. As of 2026-10-31, S1 (boot/startup -> services), S3 (update
+admission), and S4 (serial getty/login) are closed offline; S2 (auth ->
+privileged sink) is traced structurally with its upstream authorization left
+live-gated; S5 is the ranked-finding table. A string match or bundled software version alone does not
 count as a vulnerability. Live camera tests require separate owner
 authorization, and public notes will omit credentials and operational
 exploit details.
@@ -153,6 +156,37 @@ live test). Submitters are the authenticated web/ONVIF operator
 Reachability of the `upgrade.cgi` auth gate specifically is left to S2. The
 `Mx8Q` value, device ID, and any exploit steps are kept private. Reproducible
 check: `verify-update-admission.py`.
+
+**S2 progress (2026-10-30, offline-static; not published as a vulnerability).**
+A privileged sink was located: `system(2)` in `Sofia` (the CUpgrader command
+dispatcher) executes a network/CGI-supplied "Script" field guarded only by a
+3-token substring blocklist (`telnetd`/`sleep`/`/debug`) plus a length check,
+with no allowlist or argument sanitization — a weak, bypassable-by-construction
+guard. The exact upstream authorization for this dispatch (which CGO/ONVIF
+command registers the message, and whether the authority gate covers it) is
+traced structurally, not by a full CGO->auth cross-reference, so it is marked
+**partly-resolved, not a confirmed exploitable defect**; a live bypass needs an
+owner-authorized test. No exploit, payload, credential, or device address is
+published; the detailed trace stays private. Reproducible check (sink + weak
+guard only): `verify-upgrade-rce-guard.py`.
+
+**S4 progress (2026-10-31).** Serial getty/login semantics were verified in the
+archived stock BusyBox (`v1.33.1`, uClibc, stripped ARM; `etc/inittab` sha
+`3818bb9f...`, `etc/passwd` sha `2f0f285c...`, matching the triage). The getty
+entry is
+`::respawn:/sbin/getty -L ttyS000 115200 vt100 -n root -I "Auto login as root ..."`.
+**Passwordless auto-login is NOT established:** the "Auto login as root" text is
+the `-I` issue banner — it is **absent from the BusyBox binary** and present
+only in the inittab (cosmetic). The inittab uses `-n root`, **not** the
+force-login flag `-f` (the getty option string is `^I:LH:f:hil:mt:+wn`, in which
+`f:` is the separate force option), and getty executes the login program
+(`execlp`), which authenticates against the root MD5-crypt hash `$1$...` in
+`/etc/passwd` (there is no `/etc/shadow`). This corroborates the editorial
+correction that the banner must not be read as a bypass. The root hash is not
+cracked or published. Coverage limit (stated): the exact runtime meaning of `-n`
+in this stripped build is not fully resolved; the finding is the negative
+(force flag not used; login program invoked). Live serial behavior on a camera
+is out of scope. Reproducible check: `verify-serial-login.py`.
 
 ## Hourly research pass
 
