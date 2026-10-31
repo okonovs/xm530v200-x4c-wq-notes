@@ -188,6 +188,27 @@ in this stripped build is not fully resolved; the finding is the negative
 (force flag not used; login program invoked). Live serial behavior on a camera
 is out of scope. Reproducible check: `verify-serial-login.py`.
 
+**S5 progress (2026-10-31).** The findings were ranked by impact × reachability ×
+confidence, each row backed by a component verifier (aggregated by private
+`verify-security-rankings.py`; all component verifiers PASS). Ranked, **safe-to-
+publish** findings: **(F-1)** the owner-added custom-partition root-shell hook
+(`extapp.sh`, source-address-gated, no cryptographic auth; **owner-added, not a
+vendor backdoor**; live presence unverified); **(F-2)** update admission is
+**structural only** (container CRC + version + per-partition size + an OEM
+MAC/serial binding), **no cryptographic signature is verified**, and an admitted
+update **overwrites the custom partition** — with two documented-as-code bypass
+paths ("skip check Mx8Q", "cracked image") whose reachability is **unverified**;
+**(F-4)** the serial getty "auto login as root" is a **cosmetic banner, not a
+passwordless bypass** (see S4); **(F-5)** a debug-listener binary and `iperf`
+are **dormant** (no boot-script reference in the archived corpus). **Not
+established:** no hidden vendor network backdoor, default remote password,
+unauthenticated vendor API, or confirmed exploitable parser flaw. The
+exploit-adjacent finding **(F-3)** — a privileged `system(2)` sink in `Sofia`
+guarded only by a 3-token blocklist (`telnetd`/`sleep`/`/debug`) plus a length
+check (weak / bypassable-by-construction, upstream authorization only
+**partly-resolved**) — is **withheld** from public notes pending a proven auth
+gate; it is kept private with no exploit or credential material.
+
 ## Hourly research pass
 
 1. Read the private goal, handoff, latest status, and this queue. Choose the highest-priority unfinished question that can advance with the copied corpus.

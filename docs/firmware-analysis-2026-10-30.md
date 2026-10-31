@@ -176,3 +176,25 @@ contacted. Coverage limit (stated): the exact runtime meaning of `-n` in this
 stripped `BusyBox v1.33.1` build is not fully resolved by a linear ARM decode;
 the finding is the negative (force flag not used; login program invoked).
 Reproducible check: private `verify-serial-login.py` (12 gates pass).
+
+## S5 — ranked security findings (2026-10-31, offline)
+
+The findings were ranked by impact × reachability × confidence, each row backed
+by a component verifier (aggregated by private `verify-security-rankings.py`;
+all component verifiers PASS). Safe-to-publish findings: **F-1** the owner-added
+custom-partition root-shell hook (`extapp.sh`, source-address-gated, no crypto
+auth — owner-added, not a vendor backdoor; live presence unverified); **F-2**
+update admission is structural only (CRC + version + per-partition size + an OEM
+MAC/serial binding) with **no cryptographic signature**, and an admitted update
+**overwrites the custom partition** (documented-as-code "skip check Mx8Q" and
+"cracked image" bypass paths, reachability unverified); **F-4** the serial
+getty "auto login as root" is a cosmetic banner, **not** a passwordless bypass
+(see the S4 section above); **F-5** a debug-listener binary and `iperf` are
+dormant (no boot-script reference in the archived corpus). **Not established:**
+no hidden vendor network backdoor, default remote password, unauthenticated
+vendor API, or confirmed exploitable parser flaw; live service exposure is
+unknown. The exploit-adjacent finding **F-3** — a privileged `system(2)` sink in
+`Sofia` guarded only by a 3-token blocklist (`telnetd`/`sleep`/`/debug`) plus a
+length check, upstream authorization only partly-resolved — is **withheld** from
+public notes pending a proven auth gate and kept private with no exploit or
+credential material. No camera was contacted.
