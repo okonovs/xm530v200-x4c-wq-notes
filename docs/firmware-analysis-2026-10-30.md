@@ -223,3 +223,35 @@ through a reused base register** are not fully modeled by a linear scan, and the
 runtime value needs a type-aware Ghidra trace plus a live test — consistent with
 the 2026-10-30 correction that these negative checks do not by themselves prove
 the field stays zero or is config-driven. No camera / Frigate / LAN contact.
+
+## Codec-field writer — shared-library residual corrected (2026-10-31, offline)
+
+Roadmap item **#1** was advanced by testing its specific residual: "5 stripped
+`.so` have unsearched exported symbols; a codec setter may live in a shared
+library." A new dual-decoder verifier (`verify-codec-so-writer.py`, 6 gates PASS;
+capstone for the `.so`, whose `objdump -d` yields 0 lines on this build — noted
+honestly) **disproves the direct cases**:
+
+- **The "stripped" label is a `nm`/`.symtab` artifact.** All six bundled `.so`
+  carry a `.dynsym` with resolvable exports (`libdvr.so` 582,
+   `libXMcrypto.so` 141, `libnl.so.1` 392, `libjson.so.0` 121, `libiw.so.29`
+   105, `libaf.so` 76).
+- **No codec-family symbol is exported** by any `.so` (`Venc`/`Encode`/`Codec`/
+   `H264`/`H265`/`HEVC`/`Chn`/`set_chn` → 0 matches).
+- **0 of 121 resolved vendor functions** (`Flash*`/`System*`/`Net*`/`Ptz*`/
+   `CryptoBurn*`/`Alarm*`/`Comm*`/`Uart*`/`ide_*`/`motor_*`/`envgetvalue`/
+   `mii_diag`, …) **write `+0x7c`**, and **0 `+0x7c` stores exist in any `.so`
+   `.text`** (7779 instructions). The field address `0x53c3bc` is never a
+   literal in `Sofia` `.text`.
+- A few vendor PLT symbols (`CaptureSetIProp`, `HisiMmzAlloc/Free`,
+   `peerConn_init`, …) have no provider in the extracted lib set and are not
+   `dlopen`/`dlsym` (kernel module / unextracted library), but none is codec-
+   family; `libaf.so` exists only in the tested `TB-user` image, not stock.
+
+**Roadmap #1 remains OPEN**, now narrowed to two genuinely hard paths:
+**(a) pointer-deref aliasing** through a global holding `&0x53c340` (a type-
+aware Ghidra trace is the right tool), and **(b) the runtime value** of the
+field. This is consistent with the 2026-10-30 correction #2: the pass does not
+claim the field "lacks a writer" — it establishes that no *directly analyzable*
+writer exists in `Sofia` or the bundled libraries. No camera / Frigate / LAN
+contact.

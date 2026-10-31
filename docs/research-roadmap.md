@@ -27,12 +27,23 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
     writes `+0x7c`, the 2 `memset` 'base' candidates are false positives (r0=
     stack), and 0 of the `+0x7c` stores in `.text` use base `0x53c340` — so the
     direct-callee coverage gap is **closed**. The field's **source/runtime value
-    remains unknown**: the 5 stripped `.so` (a setter could live in a stripped
-    shared library) and indexed/indirect stores through a reused base register
-    are not fully modeled, and the runtime value needs a type-aware Ghidra trace
-    plus a live test. Verifier `verify-codec-callees-0x7c.py` (gates PASS);
-    `verify-codec-writer-repaired.py` remains OPEN by construction (no
-    unconditional PASS).
+    remains unknown**. The "a stripped `.so` may write `+0x7c`" residual is
+    **disproven for all directly analyzable cases** (`verify-codec-so-writer.py`,
+    6 gates PASS): all 6 bundled `.so` carry `.dynsym` (the "stripped" label was
+    a `nm`/`.symtab` artifact — the dynamic symbol table is present), **no codec-
+    family symbol is exported** by any `.so`, **0 of 121 resolved vendor
+    functions** (`Flash`/`System`/`Net`/`Ptz`/`CryptoBurn`/… from `libdvr.so`/
+    `libXMcrypto.so`/…) write `+0x7c`, and **0 `+0x7c` stores exist in any `.so`
+    `.text`** (7779 insns); the field address `0x53c3bc` is never a literal. The
+    open surface is now narrowed to **(a) pointer-deref aliasing** through a
+    global holding `&0x53c340` (a type-aware Ghidra trace is the right tool) and
+    **(b) the runtime value** of the field. A few vendor PLT symbols
+    (`CaptureSetIProp`, `HisiMmzAlloc/Free`, `peerConn_init`, …) have no provider
+    in the extracted lib set (not `dlopen`/`dlsym`; kernel module / unextracted
+    lib) but none is codec-family; `libaf.so` exists only in the tested `TB-user`
+    image, not stock. Verifiers `verify-codec-callees-0x7c.py` and
+     `verify-codec-so-writer.py` PASS; `verify-codec-writer-repaired.py` remains
+    OPEN by construction (no unconditional PASS).
 - **#2 (H.264 blocker) - partly resolved.** The tested firmware loaded
     H.265 support and yielded no decodable H.264 frames. The archived
     user-space binary contains an H.264 path, and reference H.264 driver
