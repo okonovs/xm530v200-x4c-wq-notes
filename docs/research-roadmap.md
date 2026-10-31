@@ -57,6 +57,17 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
     bit 1 (`0x2c1388` `ubfx r3,r3,#1,#1`) and bit 0 (`0x2c14c8` `andeq r3,r3,#1`).
     `0x2bf188` is the **only** `+0x7c` store in `.text` whose base provably traces to
     `0x53c340` (of 149 total). OPEN: the bit-0 codec value source (config vs fixed).
+    **Extended by pass 34** (`verify-codec-bit0-writer.py`, all 6 gates PASS,
+    dual-decoder, TB-user `Sofia`): the `0x53c340 + 0x7c` field has exactly **one**
+    statically-provable **direct** writer, `0x2bf188` (`strne r3,[r4,#0x7c]`; base
+    `r4` loads `0x53c340` at `0x2bf158`), and it is a bit-forcer (bits `0x0a`; `0x0a
+    & 0x1 == 0`), **not** the bit-0 value setter. Three apparent "computed-base"
+    writers a naive back-track flags (`0x112f04`, `0x11419c`, `0x1144dc`) are proven
+    **per-instance** (`[fp,-8]+0x10000`), not the codec global — register-reuse
+    false positives. The bit-0 codec value source therefore remains unprovable by a
+    literal-keyed / shallow scan; the remaining hypothesis is a deep computed-base
+    writer or a config value via an untraced callee (type-aware taint / live test).
+    Roadmap #1 stays OPEN (now a narrower, stronger statement than pass 30).
 - **#2 (H.264 blocker) - partly resolved.** The tested firmware loaded
     H.265 support and yielded no decodable H.264 frames. The archived
     user-space binary contains an H.264 path, and reference H.264 driver
