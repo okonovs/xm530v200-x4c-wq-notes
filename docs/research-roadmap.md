@@ -50,6 +50,13 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
        `verify-codec-writer-aliasing.py` now report the field IS written (their
        "no-write" gates correctly FAIL); `verify-codec-writer-repaired.py` and
         `verify-h264-codec-writer.py` remain OPEN by construction.
+
+    **Refined by pass 30** (`verify-codec-writer-0x2bf188.py`, all 6 gates PASS,
+    dual-decoder): the `0x2bf188` store is a **bit-forcer**, not the codec-value
+    setter. It forces bits `0x0a` (bits 1,3) idempotently; the codec select reads
+    bit 1 (`0x2c1388` `ubfx r3,r3,#1,#1`) and bit 0 (`0x2c14c8` `andeq r3,r3,#1`).
+    `0x2bf188` is the **only** `+0x7c` store in `.text` whose base provably traces to
+    `0x53c340` (of 149 total). OPEN: the bit-0 codec value source (config vs fixed).
 - **#2 (H.264 blocker) - partly resolved.** The tested firmware loaded
     H.265 support and yielded no decodable H.264 frames. The archived
     user-space binary contains an H.264 path, and reference H.264 driver
