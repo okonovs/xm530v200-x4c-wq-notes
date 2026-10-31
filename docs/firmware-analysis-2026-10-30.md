@@ -198,3 +198,28 @@ unknown. The exploit-adjacent finding **F-3** — a privileged `system(2)` sink 
 length check, upstream authorization only partly-resolved — is **withheld** from
 public notes pending a proven auth gate and kept private with no exploit or
 credential material. No camera was contacted.
+
+## Codec-field writer trace — direct-callee gap closed (2026-10-31, offline)
+
+Roadmap item **#1** was advanced. The repaired codec-writer verifier
+(`verify-codec-writer-repaired.py`) proved the VENC codec field at vma
+`0x53c3bc` (`0x53c340 + 0x7c`, the H.264/H.265 select, in `.bss`) is never
+written through a recently-pc-loaded base register, and it **refused** to call
+that a no-writer proof, naming a residual: **6 direct-internal call sites that
+receive `&0x53c340` but were not analyzed body-wise**. A new dual-decoder,
+non-vacuous verifier (`verify-codec-callees-0x7c.py`, gates PASS) closes that
+gap: the 6 call sites resolve to **5 distinct callees** (all `std::string::_S_
+construct`/config helpers on their own stack buffers), **none of whose bodies
+writes `+0x7c`**; the only 2 `memset`/`memcpy` whose `r0` *looks* like base are
+**false positives** (`r0` is actually `sp+52`/`sp+40`); and **0 of the `+0x7c`
+stores in `.text`** (164 via objdump, 149 via capstone — the two decoders
+independently find the same stores, so the cross-check is non-vacuous) use base
+`0x53c340`.
+
+**Roadmap #1 remains OPEN.** This does not establish the field's source or
+runtime value: the 5 **stripped `.so`** (a codec setter could live in a
+stripped shared library, e.g. `libdvr.so`) and **indexed/indirect stores
+through a reused base register** are not fully modeled by a linear scan, and the
+runtime value needs a type-aware Ghidra trace plus a live test — consistent with
+the 2026-10-30 correction that these negative checks do not by themselves prove
+the field stays zero or is config-driven. No camera / Frigate / LAN contact.

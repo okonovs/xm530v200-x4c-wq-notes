@@ -19,12 +19,20 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
 
 ## Progress (as of 2026-10-30, 16 offline passes)
 
-- **#1 (codec field) - open.** The field at vma `0x53c3bc` is in `.bss`
-    and starts at zero. REA/Ghidra refuted the earlier `0x61120` writer
-    candidate: that store belongs to another structure. The later negative
-    verifiers search limited literal-load and nearby-call patterns; they do
-    not establish that the field lacks a writer or is config-driven. Its
-    runtime source remains unknown.
+- **#1 (codec field) - open (advanced 2026-10-31).** The field at vma `0x53c3bc`
+    is in `.bss` and starts at zero. REA/Ghidra refuted the earlier `0x61120`
+    writer candidate: that store belongs to another structure. **The 6 direct-
+    internal call sites that receive `&0x53c340` were analyzed body-wise**
+    (dual-decoder capstone+objdump, non-vacuous): none of the 5 distinct callees
+    writes `+0x7c`, the 2 `memset` 'base' candidates are false positives (r0=
+    stack), and 0 of the `+0x7c` stores in `.text` use base `0x53c340` — so the
+    direct-callee coverage gap is **closed**. The field's **source/runtime value
+    remains unknown**: the 5 stripped `.so` (a setter could live in a stripped
+    shared library) and indexed/indirect stores through a reused base register
+    are not fully modeled, and the runtime value needs a type-aware Ghidra trace
+    plus a live test. Verifier `verify-codec-callees-0x7c.py` (gates PASS);
+    `verify-codec-writer-repaired.py` remains OPEN by construction (no
+    unconditional PASS).
 - **#2 (H.264 blocker) - partly resolved.** The tested firmware loaded
     H.265 support and yielded no decodable H.264 frames. The archived
     user-space binary contains an H.264 path, and reference H.264 driver
