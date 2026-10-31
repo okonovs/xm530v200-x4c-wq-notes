@@ -202,6 +202,8 @@ owner-authorized test. No exploit, payload, credential, or device address is
 published; the detailed trace stays private. Reproducible check (sink + weak
 guard only): `verify-upgrade-rce-guard.py`.
 
+**S2 refinement (2026-10-31, offline-static; not published as a vulnerability).** A follow-up call-graph check determined that the `CUpgrader` `system()` sink sits on a dispatch channel whose caller set is **disjoint** from the main `COperateSet` authority gate (the handler logging `is Not Support` / `is Unauthorized`): the gate neither reaches the sink nor is reached by it (bidirectional), so that gate does **not** cover this path. This narrows the open S2 question to **the `CUpgrader` channel’s own upstream authentication** (its web / ONVIF / cloud callers), which is still untraced, plus an owner-authorized live-bypass test. No caller addresses, payload, credential, or device target are published; the detailed trace stays private. Reproducible check: `verify-upgrade-auth-channel.py` (dual-decoder capstone + objdump; 6 gates PASS).
+
 **S4 progress (2026-10-31).** Serial getty/login semantics were verified in the
 archived stock BusyBox (`v1.33.1`, uClibc, stripped ARM; `etc/inittab` sha
 `3818bb9f...`, `etc/passwd` sha `2f0f285c...`, matching the triage). The getty
