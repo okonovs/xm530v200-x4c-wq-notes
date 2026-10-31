@@ -255,3 +255,30 @@ field. This is consistent with the 2026-10-30 correction #2: the pass does not
 claim the field "lacks a writer" — it establishes that no *directly analyzable*
 writer exists in `Sofia` or the bundled libraries. No camera / Frigate / LAN
 contact.
+
+## Codec-field writer — global-pointer aliasing closed (2026-10-31, offline)
+
+Roadmap item **#1** advanced on its last offline-analyzable aliasing path. A
+new rigorous verifier (`verify-codec-writer-aliasing.py`, 5 gates PASS; capstone,
+with the honest residual stated) answers: *could the codec field `0x53c3bc`
+(base `0x53c340 + 0x7c`, the H.264/H.265 select) be written through a pointer
+that aliases base `0x53c340`?*
+
+- **`0x53c340` is materialized only as a pc-relative literal in `.text`** (28
+  occurrences); **no `.data`/`.bss`/`.rodata`/`.got` global holds it as a
+    pointer**. The struct is never reached through a stored global.
+- A **backward, clobber-aware** provenance trace of **all 149 `+0x7c` stores**
+   shows **0 provably use base `0x53c340`** (`BASE-LITERAL 0`, `LOST 102`,
+    `CALL-CLOBBER 31`, `UNKNOWN 16`); no `memcpy/memset/memmove` carries the
+   base or the field. The 7 "candidate writes" a naive forward liveness scan
+   produced were **false positives** — the forward scan did not invalidate
+    `r0`–`r3` on `bl`/`blx`; the clobber-aware trace retires them.
+- **The global-pointer aliasing class is closed.** Roadmap **#1 remains OPEN** on
+   two paths a static literal-keyed scan cannot close: **(a) a computed/indirect
+    base** evaluating at runtime to `0x53c340` (the 16 `UNKNOWN`-provenance
+    stores, plus runtime-computed bases including kernel-module / unextracted
+    vendor PLT providers — the precise next target), and **(b) the runtime value**
+    of the field. This is consistent with the 2026-10-30 correction: the pass
+    does not claim the field "lacks a writer"; it closes the global-pointer
+    aliasing class and narrows the open surface. No camera / Frigate / LAN
+   contact.

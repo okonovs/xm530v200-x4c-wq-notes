@@ -35,14 +35,25 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
     functions** (`Flash`/`System`/`Net`/`Ptz`/`CryptoBurn`/… from `libdvr.so`/
     `libXMcrypto.so`/…) write `+0x7c`, and **0 `+0x7c` stores exist in any `.so`
     `.text`** (7779 insns); the field address `0x53c3bc` is never a literal. The
-    open surface is now narrowed to **(a) pointer-deref aliasing** through a
-    global holding `&0x53c340` (a type-aware Ghidra trace is the right tool) and
-    **(b) the runtime value** of the field. A few vendor PLT symbols
-    (`CaptureSetIProp`, `HisiMmzAlloc/Free`, `peerConn_init`, …) have no provider
-    in the extracted lib set (not `dlopen`/`dlsym`; kernel module / unextracted
-    lib) but none is codec-family; `libaf.so` exists only in the tested `TB-user`
-    image, not stock. Verifiers `verify-codec-callees-0x7c.py` and
-     `verify-codec-so-writer.py` PASS; `verify-codec-writer-repaired.py` remains
+    open surface is now narrowed to **(a) a computed/indirect base** that
+    evaluates at runtime to `0x53c340` (arithmetic, or a value returned from a
+    kernel module / the unextracted vendor PLT providers — the 16 `UNKNOWN`-
+    provenance stores) and **(b) the runtime value** of the field. A rigorous
+    **backward, clobber-aware provenance trace** (`verify-codec-writer-aliasing.py`,
+    5 gates PASS) shows `0x53c340` is materialized **only as a pc-relative literal
+    in `.text` (28 occurrences; 0 globals hold it as a pointer)**, and **0 of the
+    149 `+0x7c` stores provably use base `0x53c340`** (`BASE-LITERAL 0`,
+    `LOST 102`, `CALL-CLOBBER 31`, `UNKNOWN 16`); the 7 earlier "candidate
+    writes" were liveness false positives (the naive forward scan did not
+    invalidate `r0`–`r3` on `bl`/`blx`). The **global-pointer aliasing class is
+    closed**; the remaining paths are not closable by a static literal-keyed
+    scan. A few vendor PLT symbols (`CaptureSetIProp`, `HisiMmzAlloc/Free`,
+     `peerConn_init`, …) have no provider in the extracted lib set (not
+    `dlopen`/`dlsym`; kernel module / unextracted lib) but none is codec-family;
+     `libaf.so` exists only in the tested `TB-user` image, not stock. Verifiers
+      `verify-codec-callees-0x7c.py`, `verify-codec-so-writer.py`, and
+      `verify-codec-writer-aliasing.py` PASS; `verify-codec-writer-repaired.py`
+    remains
     OPEN by construction (no unconditional PASS).
 - **#2 (H.264 blocker) - partly resolved.** The tested firmware loaded
     H.265 support and yielded no decodable H.264 frames. The archived
