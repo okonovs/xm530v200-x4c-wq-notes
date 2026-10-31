@@ -199,7 +199,10 @@ length check, upstream authorization only partly-resolved — is **withheld** fr
 public notes pending a proven auth gate and kept private with no exploit or
 credential material. No camera was contacted.
 
-## Codec-field writer trace — direct-callee gap closed (2026-10-31, offline)
+## [SUPERSEDED 2026-10-31] Codec-field writer trace — direct-callee gap closed (2026-10-31, offline)
+
+> **SUPERSEDED:** a PC-relative `LDR` `+4` vs `+8` decoding bug made this report a false negative. The codec field IS written (`0x2bf188`). See the **SUPERSEDED: codec-field writer not found** section below. This section's "gap closed / not written" conclusion is withdrawn.
+
 
 Roadmap item **#1** was advanced. The repaired codec-writer verifier
 (`verify-codec-writer-repaired.py`) proved the VENC codec field at vma
@@ -256,7 +259,10 @@ claim the field "lacks a writer" — it establishes that no *directly analyzable
 writer exists in `Sofia` or the bundled libraries. No camera / Frigate / LAN
 contact.
 
-## Codec-field writer — global-pointer aliasing closed (2026-10-31, offline)
+## [SUPERSEDED 2026-10-31] Codec-field writer — global-pointer aliasing closed (2026-10-31, offline)
+
+> **SUPERSEDED:** the `+4` decoding bug made "aliasing closed / 0 stores use base `0x53c340`" a false negative. With the correct `+8` convention the field IS written (`0x2bf188`). See the **SUPERSEDED: codec-field writer not found** section below.
+
 
 Roadmap item **#1** advanced on its last offline-analyzable aliasing path. A
 new rigorous verifier (`verify-codec-writer-aliasing.py`, 5 gates PASS; capstone,
@@ -282,3 +288,46 @@ that aliases base `0x53c340`?*
     does not claim the field "lacks a writer"; it closes the global-pointer
     aliasing class and narrows the open surface. No camera / Frigate / LAN
    contact.
+
+---
+
+## SUPERSEDED: codec-field "writer not found" (corrected 2026-10-31)
+
+The two preceding sections — "direct-callee gap closed" and "global-pointer
+aliasing closed" — reported that the codec field `0x53c3bc` (`0x53c340 + 0x7c`)
+was **not written** and that the aliasing path was closed. **Both claims are
+withdrawn: the field IS written.**
+
+The root cause was a **PC-relative `LDR` decoding bug** in the newer verifiers
+(`verify-codec-callees-0x7c.py`, `verify-codec-writer-repaired.py`,
+`verify-codec-writer-absent.py`, `verify-codec-writer-aliasing.py`,
+`verify-h264-codec-writer.py`): they computed the pool address as
+**instruction-address `+ 4 + imm`** instead of the ARM architectural
+**`+ 8 + imm`** (PC at execute time is the *next* instruction's address; objdump
+annotates `2c1358: ldr r7,[pc,#0x344] @ 0x2c16a4`, and `0x2c1358 + 8 + 0x344 =
+0x2c16a4`). Reading `+ 4` selected the **adjacent** pool literal `0x4d20d0` (the
+per-channel config array) instead of `0x53c340` (the codec struct), so the
+"which `ldr` resolves to `0x53c340`" step was wrong and every downstream "0
+writes / aliasing closed" result was a **false negative**.
+
+**Corrected ground truth** (verified with the `+8` convention, dual-decoder):
+ - `0x53c340` is loaded at **43** PC-relative sites (not 34).
+ - The codec field **`0x53c340 + 0x7c` IS written** at `0x2bf188`: a conditional
+    read-modify-write `ldr r3,[r4,#0x7c]; tst r3,#0x0a; orrne r3,r3,#0x0a;
+      strne r3,[r4,#0x7c]` (with `r4 = 0x53c340`) that sets bits `0x0a` of the
+    field. It is **read** for the bit-0 codec select at `0x2c1380`. There are
+    149 `+0x7c` stores and 187 `+0x7c` reads in `.text`.
+ - The 5 verifiers are fixed to `+8` and now **correctly report the write**
+    (their "no-write" gates now FAIL, which is the correct outcome). The original
+      `verify-h264-bss-codec.py` / `verify-h264-codec-driven.py` already used
+      `+8` and are unaffected.
+
+The shared-library findings are **unaffected** by the bug and still hold: all 6
+bundled `.so` carry `.dynsym`, no codec-family symbol is exported, and **0 `+0x7c`
+stores exist in any `.so` `.text`** — so no *shared-library* writer. **Roadmap
+#1 remains OPEN**, now with the writer *located* (`0x2bf188` RMW) and the open
+questions being: config-driven vs. fixed value of the RMW, the field's runtime
+value, and indirect-call / out-of-window alias paths. See
+`EDITORIAL-CORRECTIONS.md` ("PC-relative LDR bug +4 vs +8", 2026-10-31); this
+mirrors the 2026-10-29 codec-field method-bug finding (a decoding error produced
+a false negative that would mislead a patch). No camera / Frigate / LAN contact.

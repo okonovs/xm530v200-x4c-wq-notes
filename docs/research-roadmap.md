@@ -19,42 +19,37 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
 
 ## Progress (as of 2026-10-30, 16 offline passes)
 
-- **#1 (codec field) - open (advanced 2026-10-31).** The field at vma `0x53c3bc`
-    is in `.bss` and starts at zero. REA/Ghidra refuted the earlier `0x61120`
-    writer candidate: that store belongs to another structure. **The 6 direct-
-    internal call sites that receive `&0x53c340` were analyzed body-wise**
-    (dual-decoder capstone+objdump, non-vacuous): none of the 5 distinct callees
-    writes `+0x7c`, the 2 `memset` 'base' candidates are false positives (r0=
-    stack), and 0 of the `+0x7c` stores in `.text` use base `0x53c340` — so the
-    direct-callee coverage gap is **closed**. The field's **source/runtime value
-    remains unknown**. The "a stripped `.so` may write `+0x7c`" residual is
-    **disproven for all directly analyzable cases** (`verify-codec-so-writer.py`,
-    6 gates PASS): all 6 bundled `.so` carry `.dynsym` (the "stripped" label was
-    a `nm`/`.symtab` artifact — the dynamic symbol table is present), **no codec-
-    family symbol is exported** by any `.so`, **0 of 121 resolved vendor
-    functions** (`Flash`/`System`/`Net`/`Ptz`/`CryptoBurn`/… from `libdvr.so`/
-    `libXMcrypto.so`/…) write `+0x7c`, and **0 `+0x7c` stores exist in any `.so`
-    `.text`** (7779 insns); the field address `0x53c3bc` is never a literal. The
-    open surface is now narrowed to **(a) a computed/indirect base** that
-    evaluates at runtime to `0x53c340` (arithmetic, or a value returned from a
-    kernel module / the unextracted vendor PLT providers — the 16 `UNKNOWN`-
-    provenance stores) and **(b) the runtime value** of the field. A rigorous
-    **backward, clobber-aware provenance trace** (`verify-codec-writer-aliasing.py`,
-    5 gates PASS) shows `0x53c340` is materialized **only as a pc-relative literal
-    in `.text` (28 occurrences; 0 globals hold it as a pointer)**, and **0 of the
-    149 `+0x7c` stores provably use base `0x53c340`** (`BASE-LITERAL 0`,
-    `LOST 102`, `CALL-CLOBBER 31`, `UNKNOWN 16`); the 7 earlier "candidate
-    writes" were liveness false positives (the naive forward scan did not
-    invalidate `r0`–`r3` on `bl`/`blx`). The **global-pointer aliasing class is
-    closed**; the remaining paths are not closable by a static literal-keyed
-    scan. A few vendor PLT symbols (`CaptureSetIProp`, `HisiMmzAlloc/Free`,
-     `peerConn_init`, …) have no provider in the extracted lib set (not
-    `dlopen`/`dlsym`; kernel module / unextracted lib) but none is codec-family;
-     `libaf.so` exists only in the tested `TB-user` image, not stock. Verifiers
-      `verify-codec-callees-0x7c.py`, `verify-codec-so-writer.py`, and
-      `verify-codec-writer-aliasing.py` PASS; `verify-codec-writer-repaired.py`
-    remains
-    OPEN by construction (no unconditional PASS).
+- **#1 (codec field) - open (CORRECTED 2026-10-31: a PC+4/`+8` decoding bug had
+    masked the writer).** The field is `0x53c3bc` = `0x53c340 + 0x7c` (H.264/
+    H.265 select, in `.bss`, zero-initialized). It is **read** for the bit-0
+    codec select at `0x2c1380` (`ldr r3,[r7,#0x7c]`, `r7 = 0x53c340`) and
+     **written** by a conditional read-modify-write at `0x2bf188`
+     (`ldr r3,[r4,#0x7c]; tst r3,#0x0a; orrne r3,r3,#0x0a; strne r3,[r4,#0x7c]`,
+      `r4 = 0x53c340`) that sets bits `0x0a` of the field. `0x53c340` is loaded
+    at **43** PC-relative sites; there are 149 `+0x7c` stores and 187 `+0x7c`
+    reads in `.text`. The earlier `0x61120` candidate was a different structure.
+    A **decoding bug** in the newer verifiers (PC-relative `LDR` computed as
+     instruction-address `+ 4 + imm` instead of the ARM `+ 8 + imm` convention)
+    read the *adjacent* pool literal (`0x4d20d0`, the per-channel config array)
+     and reported "0 `+0x7c` stores use base `0x53c340` / the field is not
+     written / aliasing is closed" — **false negatives, now withdrawn** (see
+     `EDITORIAL-CORRECTIONS.md` "PC-relative LDR bug +4 vs +8", 2026-10-31;
+      mirrors the 2026-10-29 codec-field method-bug finding). The 5 affected
+     verifiers are fixed to `+8` and now correctly report the write.
+
+    What remains OPEN for #1: whether the `0x2bf188` RMW value (bits `0x0a`,
+     derived from a flag/branch) is **config-driven vs. a fixed default**, the
+     field's **runtime value**, and the **indirect-call / out-of-window alias**
+     paths (not modeled by a static single-pass scan). The shared-library
+    findings are unaffected by the bug and still hold: all 6 bundled `.so` carry
+     `.dynsym` (the "stripped" label was a `nm`/`.symtab` artifact), **no codec-
+    family symbol is exported**, and **0 `+0x7c` stores exist in any `.so` `.text`**
+     (7779 insns) — so no *shared-library* writer, though an indirect path via a
+     computed base or a kernel module / unextracted vendor PLT provider remains.
+     Verifiers `verify-codec-callees-0x7c.py`, `verify-codec-so-writer.py`, and
+       `verify-codec-writer-aliasing.py` now report the field IS written (their
+       "no-write" gates correctly FAIL); `verify-codec-writer-repaired.py` and
+        `verify-h264-codec-writer.py` remain OPEN by construction.
 - **#2 (H.264 blocker) - partly resolved.** The tested firmware loaded
     H.265 support and yielded no decodable H.264 frames. The archived
     user-space binary contains an H.264 path, and reference H.264 driver
