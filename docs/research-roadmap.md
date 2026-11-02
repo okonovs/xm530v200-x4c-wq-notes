@@ -156,7 +156,20 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
    `0x53c340` and the pointer copied into the per-channel slot through
    callers, indirect calls, and bulk operations. Close this only with a
    reproducible writer/source trace, or leave it unresolved with an explicit
-   list of paths not analyzed.
+   list of paths not analyzed. — **OFFLINE-EXHAUSTED by pass 39
+   (`verify-codec-field-bit0-final.py`, 5 gates PASS, dual-decoder):** the codec
+   select field `0x53c340+0x7c` (bit 0 = H.264/H.265 select) is a **global**
+   struct (48 `ldr[pc]` load sites). Residual (a) a stripped `.so` writer is
+   **closed** — `0x53c340` is passed to **no** imported/PLT call in any window
+   (0 of 48). Residual (b) base-register aliasing is **closed** — of 300
+   `str* [reg,#0x7c]` stores, exactly **1** traces its base to `0x53c340` (the
+   bit-forcer `0x2bf188`, which forces bits `0x0a`, not bit 0); the two naive
+   "bit-0=1" candidates are proven per-channel / PC-relative false positives. So
+   **no** genuine `+0x7c` store sets bit 0 from a fixed immediate; the field
+   keeps its `.bss`-0 default (H.265). The only open item, residual (c) the
+   **runtime value** (a config/memory value may set bit 0 → H.264), is
+   **owner-gated** (a live test or Ghidra-with-types). This is a bounded,
+   explicit list of unanalyzed paths, as the goal permits.
 3. **Compare sensor programming.** Decode and compare the archived SC223A,
    SC223AP, and SC1346 register tables and callbacks with hashes, lengths,
    representative values, and an independent byte-level verifier. Do not
