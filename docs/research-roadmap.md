@@ -74,14 +74,32 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
     source and a test harness exist. The reference driver has not been
     shown compatible with the V200 board, kernel, register map, or encoder
     block. Physical H.264 capability remains open.
-- **#3 (sensor profiles) — partially mapped.** The `isp` sensor cascade
+- **#3 (sensor profiles) — mapped; open items resolved by pass 37 (2026-11-02).** The `isp` sensor cascade
     (`0x3b018-0x3b340`) dispatches **16 comparison values and 15 branch destinations**, rodata **names 33
     sensors**, and a **dynamic I2C-signature fallback** (`0x3b8a4`) builds
     `(reg 0x0b<<8)|reg 0x0a` and maps six signatures to sensors
     (`0x841->F37P`, `0x507->Q03`, `0x843->Q03P`, `0x848->H63P`, `0xa63->H63`,
-    `0xf37->F37`). The earlier open "third profile" is **SC1346**. `cels` is
+    `0xf37->F37`). `cels` is
     strongly identified as **SC223A** (id 41, 1928x1088/1920x1080).
-    Full register-table and callback comparisons remain open.
+
+    **Resolved by pass 37** (`verify-sensor-ioctl-binds.py`, all 6 gates PASS,
+    capstone + objdump + REA type-aware decompile): the two remaining offline
+    items are closed. (a) The writer `0x3c7f4` is a **per-channel `ioctl`
+    wrapper, not a struct writer** (correction of the "register table / struct"
+    framing): it computes a per-channel handle `= base + 56*index`, lazily
+    `open()`s the fd (`0x3c6d0`→`open@plt`), packs the two table halfwords
+    (advancing command-id + constant value) into a 4-byte buffer, and issues
+    `ioctl@plt` (cmd 1), with `close@plt` on error — REA (Ghidra 12.1.4,
+    `observed`) corroborates `ioctl(handle,1,buffer)`. Each table entry is thus a
+    `(command-id, arg)` device stream, not a flat reg/value map. (b) The static
+    sensor catalog is **complete**: SC223A (id 41, table `0x67eb0`), SC223AP
+    (id 46, table `0x7532c`), **SC1346** (chip-ID `0xda4d`→`0x3b77c`, which
+    loads the "SC1346" string `0x5b5d5`), and the chip-ID `0xdc42`→`0x3b8a4`
+    I2C-signature dynamic fallback (live-dependent, not statically single-sensor).
+    The only residual is which sensor is **fitted in each physical camera**
+    (needs an installed-binary hash + live I2C readback — owner-gated). No raw
+    addresses are published beyond the reproducible-check pointer; the detailed
+    trace stays private.
 - **#4 (ISP detail) — mostly done.** The user-tunable surface is a closed 9-key
     registry (`VideoColorParam` + 7 leaves incl. `Acutance`); the 11 hidden ISP
     detail families are not config keys (`verify-isp-detail-controls.py`). The
