@@ -68,12 +68,29 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
     literal-keyed / shallow scan; the remaining hypothesis is a deep computed-base
     writer or a config value via an untraced callee (type-aware taint / live test).
     Roadmap #1 stays OPEN (now a narrower, stronger statement than pass 30).
-- **#2 (H.264 blocker) - partly resolved.** The tested firmware loaded
+- **#2 (H.264 blocker) - partly resolved (offline matrix added by pass 38, 2026-11-02).** The tested firmware loaded
     H.265 support and yielded no decodable H.264 frames. The archived
     user-space binary contains an H.264 path, and reference H.264 driver
-    source and a test harness exist. The reference driver has not been
-    shown compatible with the V200 board, kernel, register map, or encoder
-    block. Physical H.264 capability remains open.
+    source and a test harness exist. **Pass 38** (`verify-h264-driver-compat.py`,
+    all 6 gates PASS) produced the compatibility matrix: the V200 hardware codec
+    module `hevc.ko` is **H.265/HEVC-only** (a real MMIO+IRQ codec driver —
+    `__arm_ioremap`/`request_threaded_irq`/`free_irq`/`misc_register` — with 17
+    `h265`/`hevc` strings and **0** `h264`/`8290`/`8270`/`7280`/`6280` strings),
+    while the reference H.264 driver `hx280enc.c` (Hantro `6280/7280/8270/8290`,
+    `base_port 0x20070000`, `irq 77` for XM530, `/dev/h264` via `misc_register`,
+    `vm_ops`/`mmap`) uses the **same `misc` + `irq` + `ioremap` device model** —
+    so the reference driver is **framework-compatible / loadable on the V200
+    kernel** (`vermagic 3.10.103+ ARMv7 p2v8`). The V200 `venc.ko` is the V4L2
+    **videobuf** chardev layer (`vb_get_buf`/`vb_put_buf`), not a hardware
+    encoder (its 4 `h264` string hits are `proc`/`seq` info). The **concrete
+    gap** is hardware-level: whether the V200 silicon has an H.264-capable
+    Hantro block at `0x20070000`/IRQ 77 (or a dual-mode block). This is a
+    **conditional verdict** (framework OK, hardware capability unproven), with a
+    concrete **recovery plan** (load `hx280enc`, probe `0x20070000`, register
+    `/dev/h264`, drive via `libxmvenc`). Physical H.264 capability remains
+    owner-gated (a separately-authorized bind/encode test); the `.ko` `.text` is
+    unlinked (vma 0) so no register-level base is claimed. Detailed trace stays
+    private.
 - **#3 (sensor profiles) — mapped; open items resolved by pass 37 (2026-11-02).** The `isp` sensor cascade
     (`0x3b018-0x3b340`) dispatches **16 comparison values and 15 branch destinations**, rodata **names 33
     sensors**, and a **dynamic I2C-signature fallback** (`0x3b8a4`) builds
@@ -143,11 +160,23 @@ Explain the actual sensor-to-stream pipeline and decide whether the main stream 
 3. **Compare sensor programming.** Decode and compare the archived SC223A,
    SC223AP, and SC1346 register tables and callbacks with hashes, lengths,
    representative values, and an independent byte-level verifier. Do not
-   infer which profile is installed on a physical camera.
+   infer which profile is installed on a physical camera. — **DONE (pass 37,
+   `verify-sensor-ioctl-binds.py`, 6 gates PASS):** the writer `0x3c7f4` is a
+   per-channel `ioctl` wrapper (not a struct writer); static catalog complete
+   (SC223A/SC223AP/SC1346 + a live I2C-signature fallback). Residual:
+   per-camera fitted-sensor identity is owner-gated (live I2C readback).
 4. **Assess H.264 driver compatibility offline.** Compare reference driver
    source and harness with the archived V200 kernel/module ABI, MMIO and IRQ
    assumptions, and device interface. Produce a compatibility matrix and
-   a proposed recovery plan; defer any bind or encode test on a camera.
+   a proposed recovery plan; defer any bind or encode test on a camera. —
+   **DONE (pass 38, `verify-h264-driver-compat.py`, 6 gates PASS):** the
+   reference H.264 driver `hx280enc.c` is **framework-compatible** with the V200
+   kernel (same `misc` + `irq` + `ioremap` device model as `hevc.ko`); the V200
+   ships **H.265-only** hardware (`hevc.ko`), so the concrete gap is the open
+   hardware question of an H.264-capable block at `0x20070000`/IRQ 77. A
+   compatibility matrix + recovery plan are produced; the verdict is
+   **conditional** (framework OK, hardware capability unproven) and the bind/
+   encode test is deferred to a separate owner authorization.
 
 Each goal needs a bounded report and reproducible check. The hourly OpenClaw
 run should stop when these offline goals are complete or explicitly blocked,
