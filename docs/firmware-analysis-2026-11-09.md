@@ -281,3 +281,131 @@ frames); H.265 is what the device actually produces. This closes the roadmap
 
 *No camera, Frigate, LAN, or network contact is implied by this page. All live
 results above were obtained under owner authorization and are dated 2026-11-09.*
+
+---
+
+# Appendix A — `libdvr.so` structural deep-dive
+
+Focus on `TB-user/lib/libdvr.so`, the **DVR/web backend**, because finding S2
+(the upgrade RCE chain) lives here. `nm -D` is sufficient at the symbol level:
+the object is **not stripped of exports** — 424 functions are named in `.dynsym`
+— and its `.text` maps `off == vma`, so a VMA is a valid file offset.
+
+## A.1 Object map
+
+| Section | VMA | Size | Role |
+| --- | --- | --- | --- |
+| `.dynsym` | `0x1218` | `0x2460` | Dynamic symbol table (424 exported `T`/`D`). |
+| `.plt` | `0x6100` | `0x0e18` | PLT (139 imports). |
+| `.text` | `0x6f18` | `0x1c9f0` (≈118 KB) | All code. |
+| `.rodata` | `0x23918` | `0x64bf` | Constants + `LIBDVR : FILE->%s, LINE->%d` diagnostics. |
+| `.data` | `0x32658` | `0x0448` | Initialized data. |
+| `.bss` | `0x32aa0` | `0xbb4c` (≈48 KB) | Globals (`s_upgradeRxCb`, mutexes, condvars). |
+
+## A.2 Exported function families (424 total)
+
+| Count | Family | Role |
+| --- | --- | --- |
+| 59 | `Net*` | IPv4/IPv6, gateway/host IP, UPnP, DNS, sockets. |
+| 24 | `motor_*` | PTZ/pan-tilt motor (drives `kmotor.ko` GPIOs). |
+| 23 | `Get*` | Getter accessors (config/status/capabilities). |
+| 16 | `ide_*` | IDE/disk storage backend. |
+| 16 | `Backup*` | Backup/restore (format, mount, play, eject). |
+| 15 | `System*` | `SystemReboot`, `SystemBeep`, temperature, charge, zoneinfo, `SystemLog*`, `SystemCheckEncrypt`, power caps. |
+| 13 | `X*`/`Xm*` | Vendor `XM`-prefixed helpers. |
+| 13 | `Lib*` | `LibXmDvr_*` public API (device secret, etc.). |
+| 11 | `Comm*` | Serial/UART comm (`CommAsConsole`). |
+| 11 | `XMJSO*` | Vendor JSON-serial-object helpers (the web-API glue). |
+| 10 | `Ptz*` | PTZ high-level (presets, tours, scans). |
+| 8 | `Alarm*` | Alarm I/O slots, wireless alarm. |
+| 7 | `Flash*` | Flash erase/destroy/format (OTA path). |
+| 6 | `Uart*` | UART (RS485 / debug). |
+| 5 | `Watchdog*` | WDT settimeout/start (`xm_wdt.ko`). |
+| 4 | `Wlan*` | WiFi (`wlandaemon`/`cfg80211`). |
+| 3 | `Ble*` | Bluetooth (`BleStartGetButtonStatus`, `BleClrConfig`). |
+| 3 | `Fifo*` | Named-FIFO IPC (e.g. `/var/tmp/4gstate`). |
+
+The **`XMJSO` / `LibXmDvr_*` / `getUpgradeParams`** families are the web-API
+glue: the `XMJSO` (JSON-serial-object) layer turns web requests into
+`LibXmDvr_*` calls that reach the `System*`/`Flash*`/`Net*` backends.
+
+## A.3 The S2 upgrade / shell path
+
+| Symbol | Address | Role |
+| --- | --- | --- |
+| `Libdvr_getUpgradeParams` | `0x22e3c` | Parse upgrade request parameters. |
+| `s_upgradeRxCb` (data) | `0x3e5e8` | Upgrade receive-callback global (`.bss`). |
+| `system_cmd` | `0xf8e4` | **The shell sink** — runs a command string. |
+| `LibXmDvr_System_getDeviceSecret` | `0xdfe4` | Returns the device secret (builds/verifies upgrade tokens). |
+
+`system_cmd` is a **thin, unauthenticated wrapper** — `vfork → execl(<command>)
+→ wait`, with **no authorization of its own** (the gate is upstream in the
+`XMJSO`/`LibXmDvr_*` caller and the web-layer `AuthorityList`):
+
+```
+f8e4:  push {r0,r1,r2,r3,r4,r5,r6,lr}
+f8ec:  bl   0x6c30 <vfork@plt>          ; r0 = child pid
+f8f0:  cmn  r0, #1
+f8f8:  moveq r0, #1
+f8fc:  beq  0xf940                       ; parent: skip exec
+f900:  cmp  r0, #0
+f904:  bne  0xf934                       ; child: if r0 != 0, just wait
+f90c:  ldr  r1, [pc, #0x34] @ 0xf948    ; load argv[] pointers
+f910:  ldr  r0, [pc, #0x34] @ 0xf94c    ;      (path + argv0)
+f914:  ldr  r2, [pc, #0x34] @ 0xf950
+f918:  add  r1, pc, r1
+f91c:  add  r0, pc, r0
+f920:  ldr  r3, [sp, #0xc]             ; the command string (saved argv[0])
+f924:  add  r2, pc, r2
+f928:  bl   0x6408 <execl@plt>         ; EXEC the command
+f92c:  mov  r0, #0
+f934:  bl   0x67ec <wait@plt>          ; parent: wait for child
+f940:  add  sp, sp, #0x28
+f944:  ldr  pc, [sp], #4
+```
+
+This is the structural basis of finding **F-3** (privileged `system(2)` sink
+behind a *bypassable* guard): the sink is unguarded; protection is a denylist on
+the command string plus the web-layer authority check, **not** a check *at* the
+sink.
+
+The upgrade data path is `Libdvr_getUpgradeParams` (parse) → `s_upgradeRxCb`
+(receive-callback in `.bss`) → `LibXmDvr_System_getDeviceSecret` (secret/token)
+→ `system_cmd` (execute). Diagnostics confirm a pthread mutex+cond+sem state
+machine (`upgradeMutex init error`, `upgradeCond init error`, `malloc
+upgradeSem failed`, `malloc upgradeInfoSem failed`, `s_upgradeRxCb is NULL!`).
+The `rodata` contains a `password`/`%s` **format string** used to build the
+request/token line, not a hardcoded secret. **Why the exploit is blocked on this build**: the sink is reachable and
+unguarded, but owner-authorized live testing reached 100% "Uploading/Upgrading"
+then "Upgrade failed" ×3 — no reboot, no shell — because the **structural
+admission gate** (F-2: no crypto signature, but name/size/version/OEM-binding
+checks) plus the web `AuthorityList` reject the crafted image. A real code-path
+weakness, **not demonstrated exploitable**.
+
+## A.4 Persistence / reboot surface
+
+`.rodata` contains `/mnt/mtd/Config/maintain` (the marker `app.sh` writes on
+boot) and the PTZ persistence files (`fopen /mnt/mtd/Config/Tour`, `PresetPos`,
+`Scan`, `motor.init`). The `Flash*` family (`FlashErase`, `FlashDestroy`) plus
+`SystemReboot`/`WDT` are the persistence/power-cycle surface; `Watchdog*` pairs
+with `xm_wdt.ko` (a stuck upgrade is what the WDT eventually resets).
+
+## A.5 Imported surface (139 PLT entries)
+
+`execl`/`popen`/`system` (the sink family); `fopen64`/`fscanf`/`flock`
+(config/flash I/O); `getaddrinfo`/`freeaddrinfo`/`inet_*`/`bind` (the `Net*`
+family); `cfsetispeed`/`cfmakeraw`/`__ctype_b` (the `Comm*`/`Uart*` serial
+family); `dvr_info_init`/`get_dvr_hwinfo` — a **dynamically-resolved vendor
+entry point** (the hardware-info provider), an **out-of-window alias path**
+(§9 of the main page): a writer reaching a global through this resolved entry is
+not visible in a single-pass static scan.
+
+## A.6 Method notes
+
+- `nm -D` suffices at the symbol level (full `.dynsym`); no Ghidra needed for
+  symbols. `objdump -D --start-address` auto-detects `elf32-littlearm` on this
+  host; `.text` `off == vma` so a VMA is a valid `disoff` offset.
+- The `0xf8e4`/`0xdfe4` addresses are **real** here (`.text` base `0x6f18`); the
+  earlier `0x8000` VMA→file note was for a **different** binary and does **not**
+  apply to `libdvr.so` — this object's correct constant is `0` (identity).
+- No camera / network contact.
