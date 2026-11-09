@@ -335,3 +335,28 @@ gate; it is kept private with no exploit or credential material.
 4. Keep work offline. A live camera test, reboot, flash, or network probe requires a separate, specific owner instruction. Do not publish firmware, dumps, executable maintenance payloads, credentials, private addresses, footage, or device-specific backup contents.
 
 The owner runs this offline queue hourly with a local Qwen 3.8 model in OpenClaw. The schedule is a work cadence, not proof of completion. Timeouts and failed checks remain visible in the private status; they do not turn hypotheses into findings. Stop the automation when the meaningful offline queue is complete or the remaining work requires owner action.
+
+## Progress (as of 2026-11-09 — full structural account)
+
+- **Roadmap #1 (codec field) is now live-authoritative.** Live `get_encode_info`
+  (2026-11-09) shows **H.265 on both streams** (Main 4M@20/8192k, Extra
+  D1@10/2048k, +8 kHz mono G.711 A-law audio). The field `0x53c340 + 0x7c` is
+  config-driven (`Media_OP_load_Encodecfg`); `0x2bf188` is a **bit-forcer, not
+  the value setter**. The runtime-value question is **closed live**; no working
+  camera-side H.264 on this configuration.
+- **S2 (upgrade RCE chain) — weakness confirmed, exploitability blocked.** The
+  `Sofia` `CUpgrader` `Script → system()` sink **bypasses the named authority
+  gate** (76-entry `COperateSet` + per-command `0x130cdc` sub-check + web login-
+  state gate), but is **rejected by the structural admission gate** in owner-
+  authorized non-destructive live testing (reached 100% "Uploading/Upgrading",
+  then "Upgrade failed" ×3, no reboot, no shell). **Not demonstrated
+  exploitable.** No cryptographic signature on admission (F-2).
+- **F-5 (port surface) closed live:** only `80`/`8085`/`554`/`34567`/`2323`
+  (pre-existing NFS) open; **no SSH/telnet/debug backdoor**.
+- **Web-auth model resolved live:** per-account `AuthorityList` (`SysUpgrade`,
+  `EncodeConfig`, …) + `PasswordV2` hash; the web layer **does** enforce
+  authority. The S2 bypass is a *secondary* gate.
+- **Honest residual (method limit, not a vulnerability):** out-of-window base-
+  register alias paths in a single-pass static scan cannot be excluded.
+- **Full per-file structural map published** in
+  [docs/firmware-analysis-2026-11-09.md](firmware-analysis-2026-11-09.md).

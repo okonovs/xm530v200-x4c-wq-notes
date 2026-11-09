@@ -16,7 +16,7 @@ Details: [imaging and sensor](docs/findings.md), [encoder/frame rate](docs/encod
 
 ## Offline firmware analysis, 2026-10-29
 
-The [dated analysis update](docs/firmware-analysis-2026-10-29.md) summarizes new static findings and their limits. The [research roadmap](docs/research-roadmap.md) tracks the next questions, evidence needed to close them, and the publication rules for ongoing work. These notes do not change the last tested camera configuration above.
+The [dated analysis update](docs/firmware-analysis-2026-10-29.md) summarizes new static findings and their limits. The [2026-11-09 full structural account](docs/firmware-analysis-2026-11-09.md) is a complete per-file map of the archived image (boot chain, `TB-user`/`modules`/`TB-custom` structure, the shared libraries, the security finding set, the upgrade RCE chain with its *blocked* exploitability, and the live-authoritative codec result). The [research roadmap](docs/research-roadmap.md) tracks the next questions, evidence needed to close them, and the publication rules for ongoing work. These notes do not change the last tested camera configuration above.
 
 ## Last tested configuration
 
