@@ -175,6 +175,8 @@ These are **method limits, not claimed vulnerabilities:**
 | [docs/research-roadmap.md](docs/research-roadmap.md) | The open questions and their evidence gates. |
 | [docs/firmware-analysis-2026-10-30.md](docs/firmware-analysis-2026-10-30.md) | The codec-field investigation and the decoding-bug correction. |
 | [docs/firmware-analysis-2026-10-29.md](docs/firmware-analysis-2026-10-29.md) | The first static-analysis pass and its limits. |
+- [docs/firmware-analysis-2026-11-13.md](docs/firmware-analysis-2026-11-13.md) | **H.265 pipeline RE** — capstone ioctl scan (35 constants, 5 modules) + diagnostic probe. |
+| [docs/firmware-analysis-2026-11-12.md](docs/firmware-analysis-2026-11-12.md) | OpenIPC firmware build for V200 (boot + net, no video). |
 | [docs/findings.md](docs/findings.md) / [docs/encoder-and-frame-rate.md](docs/encoder-and-frame-rate.md) / [docs/h264-investigation.md](docs/h264-investigation.md) | Live imaging, sensor, encoder, audio. |
 | [docs/camera-controls.md](docs/camera-controls.md) / [docs/root-access.md](docs/root-access.md) | Camera controls; root access & recovery. |
 | [docs/experiment-log.md](docs/experiment-log.md) / [REFERENCES.md](REFERENCES.md) / [SECURITY.md](SECURITY.md) | The dated experiment log, sources, and the security posture. |
