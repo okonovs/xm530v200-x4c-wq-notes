@@ -1,0 +1,33 @@
+name: Bounded help request
+description: Propose one small task another contributor or agent can finish
+title: "Help: "
+labels: [help wanted]
+body:
+  - type: input
+    id: question
+    attributes:
+      label: Question to answer
+      description: Ask one confirm-or-reject question.
+    validations:
+      required: true
+  - type: textarea
+    id: starting_point
+    attributes:
+      label: Public starting point
+      description: Link the public code, document, or issue containing the current evidence. State if a private input is missing.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: Describe the exact output or test evidence that answers the question and where to stop.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Scope
+      options:
+        - label: This task can be done without contacting a camera or LAN device, flashing, rebooting, or uploading vendor artifacts.
+          required: true
