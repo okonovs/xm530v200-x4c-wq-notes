@@ -1,4 +1,39 @@
-# XM530V200 X4C-WQ camera research
+# XM530V200 X4C-WQ: OpenIPC port and camera research
+
+This project is working toward a reproducible [OpenIPC](https://openipc.org/)
+port for the Xiongmai XM530V200 X4C-WQ camera. The target is a camera that boots
+OpenIPC and produces a **real, independently decodable H.265 stream**. It is a
+work in progress, and no working OpenIPC video stream has been demonstrated.
+
+## OpenIPC port: current state
+
+Last reviewed: **2026-11-16**. These are separate evidence gates, not a
+percentage of completion.
+
+| Gate | State | What the evidence supports |
+| --- | --- | --- |
+| Build | Verified locally | A maintained media probe builds and installs through a Buildroot package. A complete distributable firmware image is not established. |
+| Offline boot | Verified locally | The XM530V200 QEMU setup reaches userspace. This does not emulate a working image sensor or video encoder. |
+| Modules and device access | Partial | Vendor modules load in QEMU and the source-built probe opens `/dev/sys`, `/dev/vpss`, `/dev/h265`, and `/dev/venc_info` in safe mode, without issuing ioctls. |
+| Encoder ABI | In progress | Static ioctl analysis has found real handler paths, but firmware-variant compatibility and payload field meanings remain unresolved. |
+| Video | Unverified | No real H.265 elementary stream has been produced and independently decoded from this OpenIPC port. |
+| Physical deployment | Not started | A physical-camera test needs its own reviewed procedure and recovery plan. |
+
+Read the [port status and evidence guide](docs/openipc-port.md) before using an
+older experiment. The dated research below describes the *vendor firmware*;
+its working H.265 streams do not prove that the OpenIPC port streams video.
+
+## Help move the port forward
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). It has small tasks, an evidence
+format, and instructions for submitting results without posting vendor binaries,
+camera backups, credentials, or private network details. Agents should also read
+[AGENTS.md](AGENTS.md). [Open an issue](https://github.com/okonovs/xm530v200-x4c-wq-notes/issues/new/choose)
+for a bounded question or a reproducible result. A contributor can help review
+code and evidence without owning this camera; hardware tests require a device
+they own or are authorized to use.
+
+## Earlier vendor-firmware research
 
 Field notes and a **structural reverse-engineering account** of the Xiongmai/
 XMEye `XM530V200_X4C-WQ_8M` firmware image (firmware ID `000807A8`, software
@@ -150,8 +185,9 @@ the roadmap #1 runtime-value question.
 
 A 1080p output and a configured 20 fps do **not** independently prove the
 physical sensor mode or long-term frame stability. Details in
-[imaging & sensor](docs/findings.md), [encoder/frame rate](docs/encoder-
-frame-rate.md), [H.264 and audio](docs/h264-investigation.md).
+[imaging & sensor](docs/findings.md),
+[encoder/frame rate](docs/encoder-and-frame-rate.md), and
+[H.264 and audio](docs/h264-investigation.md).
 
 ## Honest residuals
 

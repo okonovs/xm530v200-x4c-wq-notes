@@ -1,0 +1,46 @@
+name: Evidence or correction
+description: Report one reproducible observation or correct an existing claim
+title: "Evidence: "
+labels: [evidence]
+body:
+  - type: input
+    id: question
+    attributes:
+      label: One question or claim
+      description: What exactly did you check?
+    validations:
+      required: true
+  - type: textarea
+    id: variant
+    attributes:
+      label: Source and variant
+      description: Give a revision, firmware version, and hashes where relevant. Do not attach vendor binaries.
+    validations:
+      required: true
+  - type: textarea
+    id: method
+    attributes:
+      label: Command or method
+      description: Include enough detail to repeat it with legitimately obtained inputs. Redact private identifiers.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Observed output and conclusion
+      description: Mark each conclusion verified, inferred, or unresolved; link safe evidence and any conflicting earlier claim.
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Physical camera or LAN device contacted?
+      options: ["No", "Yes, my own or authorized device"]
+    validations:
+      required: true
+  - type: textarea
+    id: next
+    attributes:
+      label: One next bounded question
+    validations:
+      required: true
