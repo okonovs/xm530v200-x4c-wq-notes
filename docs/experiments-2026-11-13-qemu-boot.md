@@ -8,9 +8,9 @@ reach a login prompt.
 
 ### Command
 ```bash
-QEMU=/tmp/qemu-bench/qemu-src/build/qemu-system-arm-unsigned
-KERNEL=/Users/oko/Projects/openipc-build/images/uImage.xm530v200
-INITRD=/tmp/initrd-full.cpio  # cpio from /Users/oko/Projects/openipc-build/images/rootfs-extract/
+QEMU=/path/to/custom-qemu-system-arm
+KERNEL=/path/to/uImage.xm530v200
+INITRD=/path/to/initrd-full.cpio  # built from your own firmware inputs
 
 timeout 30 $QEMU \
     -M xm530v200 \
@@ -61,7 +61,7 @@ Freeing initrd memory: 5372K
 ...
 Starting syslogd: OK
 Starting klogd: OK
-udhcpc: lease of 10.0.2.15 obtained from 10.0.2.2, lease time 86400
+udhcpc: lease of [QEMU_NAT_GUEST] obtained from [QEMU_NAT_HOST], lease time 86400
 Starting dropbear: OK
 Starting crond: OK
 Welcome to OpenIPC

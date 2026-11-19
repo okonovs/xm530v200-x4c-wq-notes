@@ -1,17 +1,18 @@
 #!/bin/bash
 # XM530V200 OpenIPC firmware boot test in QEMU.
 #
-#   bash qemu-boot/test-xm530v200.sh [--kernel PATH] [--initrd PATH]
+#   QEMU=/path/to/custom-qemu-system-arm KERNEL=/path/to/uImage INITRD=/path/to/initrd.cpio bash qemu-boot/test-xm530v200.sh
 #
 # Boots the OpenIPC uImage + initrd in QEMU's custom xm530v200 machine and
 # checks for a login prompt.  Exit 0 = booted to userspace.
+# Requires a custom QEMU build with the xm530v200 machine and GNU timeout.
 
 set -u
 cd "$(dirname "$0")/.."
 
-QEMU=${QEMU:-./qemu-src/build/qemu-system-arm}
-KERNEL=${KERNEL:-/Users/oko/Projects/openipc-build/images/uImage.xm530v200}
-INITRD=${INITRD:-/tmp/initrd-full.cpio}
+QEMU=${QEMU:?set QEMU to the custom xm530v200 qemu-system-arm}
+KERNEL=${KERNEL:?set KERNEL to an XM530V200 uImage}
+INITRD=${INITRD:?set INITRD to the matching initrd cpio}
 OUT=${OUT:-/tmp/qemu-boot-test}
 TIMEOUT=${TIMEOUT:-30}
 

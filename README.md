@@ -7,17 +7,18 @@ work in progress, and no working OpenIPC video stream has been demonstrated.
 
 ## OpenIPC port: current state
 
-Last reviewed: **2026-11-16**. These are separate evidence gates, not a
+Last reviewed: **2026-11-19**. These are separate evidence gates, not a
 percentage of completion.
 
 | Gate | State | What the evidence supports |
 | --- | --- | --- |
 | Build | Verified locally | A maintained media probe builds and installs through a Buildroot package. A complete distributable firmware image is not established. |
-| Offline boot | Verified locally | The XM530V200 QEMU setup reaches userspace. This does not emulate a working image sensor or video encoder. |
-| Modules and device access | Partial | Vendor modules load in QEMU and the source-built probe opens `/dev/sys`, `/dev/vpss`, `/dev/h265`, and `/dev/venc_info` in safe mode, without issuing ioctls. |
-| Encoder ABI | In progress | Static ioctl analysis has found real handler paths, but firmware-variant compatibility and payload field meanings remain unresolved. |
+| Offline boot | Verified locally | The XM530V200 QEMU setup reaches a login prompt. This does not emulate a working image sensor or video encoder. |
+| Modules and device access | Partial | All 18 Xiongmai modules loaded in a local QEMU smoke; the source-built probe opens `/dev/sys`, `/dev/vpss`, `/dev/h265`, and `/dev/venc_info` in safe mode, without issuing ioctls. |
+| Encoder ABI | In progress | Saved-flash `Sofia` and `hevc.ko` match the analyzed variant. A bounded tracer now runs on the stock camera, but encoder payload fields remain unmapped. |
+| Stock sensor and frame timing | Partial | Live readback reports numeric sensor ID 41, linear MIPI and 1928×1088 active area. A long stock-stream sample averaged 6.68 fps after an earlier near-20 fps sample; cause and chip model are unknown. |
 | Video | Unverified | No real H.265 elementary stream has been produced and independently decoded from this OpenIPC port. |
-| Physical deployment | Not started | A physical-camera test needs its own reviewed procedure and recovery plan. |
+| Physical deployment | OpenIPC not tested | Owner-authorized RAM-only tools have run on the stock camera after a verified read-only flash backup. No OpenIPC image has been booted on that camera. |
 
 Read the [port status and evidence guide](docs/openipc-port.md) before using an
 older experiment. The dated research below describes the *vendor firmware*;
@@ -62,12 +63,13 @@ cameras the owner calls **cels** and **pagalms**.
 
 ## What this is
 
-A two-part effort on the archived X4C-WQ image:
+A porting and research effort around the X4C-WQ image and physical hardware:
 
-1. **Live, non-destructive device probing** (owner-authorized, read-only: blank
-   or owner password, hard timeouts, no flash, no config change, no reboot unless
-   owner-authorized) — the stream/driver evidence.
-2. **Static reverse-engineering** of the archived firmware — a complete per-file
+1. **OpenIPC porting** — build and boot a replacement image, identify encoder
+   and sensor interfaces, and ultimately verify a real stream.
+2. **Live device evidence** — owner-authorized readback and temporary RAM-only
+   tools on the stock camera, with private backups and bounded experiments.
+3. **Static reverse-engineering** of the archived firmware — a complete per-file
    structural map plus the security finding set. The two main user-space
    executables, `Sofia` (4.95 MB) and `isp` (522 KB), are **fully symbol-
    stripped**, so their behavior is derived from section headers, PC-relative
@@ -89,8 +91,8 @@ investigation and a documented **decoding-bug correction** (a PC-relative `LDR`
 | --- | --- |
 | **Codec?** | **H.265 (HEVC)** on *both* streams — live `get_encode_info`: Main 4M@20 fps/8192 kbit/s, Extra D1@10 fps/2048 kbit/s, +8 kHz mono G.711 A-law audio. **No working camera-side H.264** (a menu/advertised H.264 sends *no frames*). |
 | **Native 2560×1440?** | **Cels:** no — 1920×1080 capture enlarged to a 2560×1440 destination (`2M->4M`). **Pagalms:** 1920×1080 after the matching upgrade; sensor not independently measured. |
-| **Sensor?** | Cels strongly identified as **SmartSens SC223A** (live ID 41, 1928×1088 active area, build-matched ISP probe). Pagalms' sensor unverified. |
-| **25 fps real?** | No in the tested mode — ISP and stream held 20 fps even with the exposed sensor-FPS set to 25 (rolled back). |
+| **Sensor?** | Current cels readback reports numeric ID **41**, linear MIPI and a 1928×1088 active area. The chip model is **not yet verified** from the live device; the earlier SC223A attribution is a hypothesis. Pagalms' sensor is unverified. |
+| **25 fps real?** | An earlier tested mode held about 20 fps despite a 25 fps request. A later long stock-stream sample averaged about **6.7 fps**. The change is unexplained, and neither proves sensor exposure cadence. |
 | **PCM audio?** | No higher-quality camera-side PCM path — RTSP stayed 8 kHz mono G.711 A-law after an LPCM request. |
 | **Backdoor ports?** | None. Only `80`/`8085` (web), `554` (RTSP), `34567` (DVRIP), `2323` (pre-existing NFS) — **no SSH/telnet/debug** (live, closed). |
 | **Upgrade RCE?** | A real **code-path weakness** (disjoint `system()` sink + bypassed authority gate + weak blocklist), **but exploitability is blocked** on this build — not demonstrated. |
@@ -177,9 +179,11 @@ the roadmap #1 runtime-value question.
 
 ## Imaging & sensor
 
-- **Cels** — SmartSens SC223A; 1920×1080 capture, `2M->4M` upscaling to the
-  2560×1440 destination (both now 1920×1080 after a custom-partition change);
-  20 fps held even when the sensor-FPS setting was pushed to 25 (rolled back).
+- **Cels** — earlier configuration showed 1920×1080 capture enlarged to a
+  2560×1440 destination. Current readback reports numeric sensor ID 41,
+  linear MIPI and a 1928×1088 active area; chip model remains unverified.
+  An earlier tested mode held 20 fps after a 25 fps request, while a later
+  long stock-stream sample averaged about 6.7 fps. The cause is unknown.
 - **Pagalms** — 1920×1080 main + 800×448 substream HEVC after the matching
   upgrade; sensor unverified.
 
@@ -219,9 +223,10 @@ These are **method limits, not claimed vulnerabilities:**
 
 ## Method, safety, licensing
 
-- **Static verifiers** never contact the camera or network. **Live probes** are
-  strictly non-destructive readback. No vendor binary, payload, backup, address,
-  credential, or footage is published.
+- **Static verifiers** never contact the camera or network. Owner-authorized
+  live work now includes readback and temporary RAM-only tools; flash and
+  persistent camera storage remain untouched. No vendor binary, payload,
+  backup, address, credential, or footage is published.
 - `Sofia`/`isp` are fully stripped (0 symbols); their behavior is derived from
   section headers, PC-relative pools, and call graphs. `libdvr.so` is **not**
   stripped of exports (424 functions in `.dynsym`) and is symbol-readable.
