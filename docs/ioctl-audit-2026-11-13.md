@@ -70,8 +70,12 @@ venc, `0x50` for vpss, `0x10` for isp).
 - `sys.ko` has **no ioctl constants** in its `.text` section — it may use a
   different mechanism (e.g., `write()`/`read()` on the char device).
 
-## QEMU boot blocker
+## QEMU boot — RESOLVED
 
-The kernel is built for the XM530 platform (`CONFIG_XM530_MACHINE_NAME="xm530v200"`).
-QEMU does not have an XM530 machine type, so the kernel cannot be booted without
-either writing a custom QEMU machine or using physical hardware.
+**Previous claim (corrected 2026-11-13)**: "QEMU does not have an XM530 machine type."
+This was incorrect. It conflated stock upstream QEMU with OpenIPC's custom build.
+
+OpenIPC/qemu-bench provides a working `xm530v200` machine (`qemu/hw/arm/xiongmai.c`).
+The OpenIPC firmware (uImage 3.10.103+ + initrd from the OpenIPC rootfs) boots in QEMU
+to a login prompt, obtains a DHCP lease, and starts dropbear SSH. See
+`docs/experiments-2026-11-13-qemu-boot.md` for the full evidence.
