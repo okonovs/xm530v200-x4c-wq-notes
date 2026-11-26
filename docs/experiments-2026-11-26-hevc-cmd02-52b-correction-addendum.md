@@ -34,7 +34,7 @@ zeroed. The earlier statement "pre-zeroed" must read "48 of 52 bytes zeroed;
   overwrites it before the `ioctl`. The stash is **dead** before the call and
   cannot be identified with any post-call read.
 - `0x39a350` is `add r3, sp, #0x18` (raw `18308DE2`; `#0x18` = decimal 24),
-  computing `sp+0x34`. It is **not** a load of the `sp+0x24` pointer. The genuine
+  computing `sp+0x18` (four bytes before the buffer at `sp+0x1c`). It is **not** a load of the `sp+0x24` pointer. The genuine
   load of `sp+0x24` is a separate site, `0x39a370 ldr r1,[sp,#0x24]`.
 
 ## What is correct in `1e0bac5` (unchanged)
